@@ -36,7 +36,7 @@ var BALANCE_UPDATE_VERSION = {
   "fuspet-bal-32": "6.25",
   "fusscience-bal-31": "6.25",
   "fusvehicle-bal-32": "6.18",
-  "hexathlon-bal-13": "6.19",
+  "hexathlon-bal-13": "6.37",
   "ninja-bal-1": "6.14",
   "potatofactory-bal-13": "6.25",
   "power-bal-20": "6.14",
