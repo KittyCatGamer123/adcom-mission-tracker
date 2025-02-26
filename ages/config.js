@@ -1,4 +1,4 @@
-﻿﻿// This is the configuration data for ADVENTURE AGES
+﻿// This is the configuration data for ADVENTURE AGES
 
 var POWERS = ['K', 'M', 'B', 'T', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF', 'GG', 'HH', 'II', 'JJ', 'KK', 'LL', 'MM', 'NN', 'OO', 'PP', 'QQ', 'RR', 'SS', 'TT', 'UU', 'VV', 'WW', 'XX', 'YY', 'ZZ', 'AAA', 'BBB', 'CCC', 'DDD', 'EEE', 'FFF', 'GGG', 'HHH', 'III', 'JJJ', 'KFC', 'LLL', 'MMM', 'NNN', 'OOO', 'PPP', 'QQQ', 'RRR', 'SSS', 'TTT', 'UUU', 'VVV', 'WWW', 'XXX', 'YYY', 'ZZZ', 'AAAA', 'BBBB', 'CCCC', 'DDDD', 'EEEE', 'FFFF', 'GGGG', 'HHHH', 'IIII', 'JJJJ', 'KKKK', 'LLLL', 'MMMM', 'NNNN', 'OOOO', 'PPPP', 'QQQQ', 'RRRR', 'SSSS', 'TTTT', 'UUUU', 'VVVV', 'WWWW', 'XXXX', 'YYYY', 'ZZZZ', 'AAAAA', 'BBBBB', 'CCCCC', 'DDDDD', 'EEEEE', 'FFFFF', 'GGGGG', 'HHHHH', 'IIIII', 'JJJJJ', 'KKKKK', 'LLLLL', 'MMMMM', 'NNNNN', 'OOOOO', 'PPPPP', 'QQQQQ', 'RRRRR', 'SSSSS', 'TTTTT', 'UUUUU', 'VVVVV', 'WWWWW', 'XXXXX', 'YYYYY', 'ZZZZZ'];
 
@@ -30,11 +30,12 @@ var BALANCE_UPDATE_VERSION = {
   "architecture-bal-18": "1.22",
   "careers-bal-1": "1.15",
   "christmas-bal-13": "1.14",
+  "dino-bal-10": "1.26",
   "egypt-bal-1": "1.22",
   "infrastructure-bal-17": "1.14",
   "innovation-bal-1": "1.22",
   "japan-bal-2": "1.15",
-  "mexico-bal-2": "1.22",
+  "mexico-bal-2": "1.26",
   "monster-bal-13": "1.12",
   "music-bal-6": "1.17",
   "scandinavia-bal-21": "1.17",

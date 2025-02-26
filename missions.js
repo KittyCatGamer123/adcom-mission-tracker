@@ -245,7 +245,7 @@ function getAllEventBalanceHtml() {
   for (i of Object.keys(DATA)) {
     const lteId = i;
 
-    if (i === "event" || i === "main") {
+    if (i === "event" || i === "main" || i === "evergreen") {
       continue;
     }
 
@@ -404,7 +404,7 @@ function updateSoonestCycle(cycle, now, soonestEvents, oneOffHours, hoursPerBala
     let nextBalanceId = cycle.LteBalanceIds[(curCycleIndex + 1) % cycle.LteBalanceIds.length];
     let nextDurationHours = hoursPerBalanceId[nextBalanceId];
     
-    if (now < curEndTime) {
+    if (now < curEndTime && curEndTime < cycleEndTime) {
       eventsFound += 1;
       
       let rewardId = cycle.LteRewardIds[curCycleIndex % cycle.LteRewardIds.length];
@@ -557,7 +557,8 @@ class PriorityQueue {
 // Sets up ENGLISH_MAP based on ENGLISH_LOCALIZATION_STRING
 function initializeLocalization() {
   // Get all lines in the form key=value.  Values may include anything but real new lines.
-  let lines = ENGLISH_LOCALIZATION_STRING.split(/\r?\n/);
+  const xloc = decodeURIComponent(escape(atob(ENGLISH_LOCALIZATION_STRING)));
+  let lines = xloc.split(/\r?\n/);
   
   for (let line of lines) {
     let keyValue = line.match(/(.*?)=(.*)/);
@@ -971,7 +972,7 @@ function renderMissions() {
 
       buttonsHtml += `<a type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#rankPopup" title="Jump to a specific rank" onclick="focusRankSelectPrompt()">#</a>`;
       
-      if (currentMainRank < DATA.main.Ranks.length) {
+      if (currentMainRank < DATA.evergreen.Ranks.length) {
         buttonsHtml += `<a href="?rank=${currentMainRank + 1}" type="button" class="btn btn-outline-secondary" title="Go forward to Rank ${currentMainRank + 1}">&rarr;</a>`;
       }
       
@@ -1249,79 +1250,122 @@ function getEventCurrentRankTitle() {
 }
 
 function describeScheduleRankReward(reward) {
+  let rewardId = reward.RewardId;
+  let singularOrPlural = (reward.Value == 1) ? "singular" : "plural";
+
   switch (reward.Reward) {
     case "Resources":
-      return `${reward.Value} ${resourceName(reward.RewardId)}`;
-      break;
+      let resName = resourceName(rewardId, singularOrPlural);
+      if (rewardId.includes('timehack')) {
+        resName = `<a tabindex="0" class="researcherName" role="button" data-html="true" data-toggle="popover" data-placement="top" data-trigger="focus" data-content="${getTimewarpPopup(rewardId)}">${resName}</a>`
+      }
+
+      return `${reward.Value} ${resName}`;
+    break;
       
     case "Gacha":
-      let gachaName = ENGLISH_MAP[`gacha.${reward.RewardId}.name`];
+      let gachaName = ENGLISH_MAP[`gacha.${rewardId}.name`];
       return `${gachaName} capsule`;
-      break;
+    break;
       
     case "Researcher":
-      let researcherRarity = ENGLISH_MAP[`researcher.rarity.${reward.RewardId}.name`];
-      let singularOrPlural = (reward.Value > 1) ? "plural" :"singular";
+      let researcherRarity = ENGLISH_MAP[`researcher.rarity.${rewardId}.name`];
       let wordForResearcher = ENGLISH_MAP[`conditionmodel.researcher.${singularOrPlural}`].toLowerCase();
       return `${reward.Value} ${researcherRarity} ${wordForResearcher}`;
-      break;
+    break;
   }
 }
 
 // Given a root.Missions object, returns an html string of a mission button
 function renderMissionButton(mission, rank, missionEtas) {
-  let type = mission.Condition.ConditionType;
-  let buttonClass = "";
-  
-  if (!missionData.Current.Remaining.includes(mission) && !missionData.Completed.Remaining.includes(mission)) {
-    buttonClass = "disabled ";
-  }
-  
-  let buttonOutlineStyle = (rank == "Completed") ? "btn" : "btn-outline";
-  
-  let etaTimeStamp = missionEtas[mission.Id];
-  let buttonDescription = "";
-  if (rank == "Completed") {
-    buttonDescription = "Uncomplete mission"
-  } else if (rank == "Current" && !etaTimeStamp) {
-    buttonDescription = "Complete mission"
-  } else if (etaTimeStamp) {
-    // We have an eta for this button
-    buttonDescription = `ETA: ${getMissionEtaString(etaTimeStamp)}`;
-  }
+    let missionType = mission.Condition.ConditionType;
+    let buttonClass = "disabled ";
+    let buttonOutlineStyle = (rank == "Completed") ? "btn" : "btn-outline";
 
-  if (type == "ResourcesSpentSinceSubscription" || type == "ResearchersUpgradedSinceSubscription") {
-    buttonClass += `${buttonOutlineStyle}-danger`;
-  } else if (type == "ResearcherCardsEarnedSinceSubscription" || (type == "ResourcesEarnedSinceSubscription" && mission['Condition']['ConditionId'] == 'darkscience')) {
-    buttonClass += `${buttonOutlineStyle}-success`;
-  } else {
-    buttonClass += `${buttonOutlineStyle}-secondary`;
-  }
-  
-  let rewardImageClasses = getRewardImageClass(mission);
-  
-  if (rank != "Completed" && rank != "Current") {
-    rewardImageClasses += " disabled";
-  }
-  
-  if ("AbTestConfig" in mission) {
-    let splitGroupId = mission.AbTestConfig.split("|");
-    let testName = splitGroupId[0];
-    let groupName = splitGroupId[1];
+    let isMissionAvailable = missionData.Current.Remaining.includes(mission) || missionData.Completed.Remaining.includes(mission);
+    if (isMissionAvailable) {
+        buttonClass = ""; // Reset since mission is available
+    }
     
-    let groupMap = getAvailableAbTestGroups();
-    let groupsForTest = groupMap[testName];
-    let groupIndex = groupsForTest.indexOf(groupName);
+    let isDangerType = ["ResourcesSpentSinceSubscription", "ResearchersUpgradedSinceSubscription"].includes(missionType);
+    let isSuccessType =
+    missionType === "ResearcherCardsEarnedSinceSubscription" || 
+        (missionType === "ResourcesEarnedSinceSubscription" && mission['Condition']['ConditionId'] === 'darkscience');
     
-    let groupClass = `altGroup-${groupIndex}`;
-    let nextGroupIndex = (groupIndex + 1) % groupsForTest.length;
-    let nextGroupName = groupsForTest[nextGroupIndex];
-    let groupTitleText = `Switch from ${mission.AbTestConfig} to alternate mission group ${testName}|${nextGroupName}`;
+    if (isDangerType) {
+        buttonClass += `${buttonOutlineStyle}-danger`;
+    } else if (isSuccessType) {
+        buttonClass += `${buttonOutlineStyle}-success`;
+    } else {
+        buttonClass += `${buttonOutlineStyle}-secondary`;
+    }
+
+    let etaTimeStamp = missionEtas[mission.Id];
+    let buttonDescription = ""
+
+    if (rank == "Completed") {
+        buttonDescription = "Uncomplete mission"
+    } 
+    else if (rank == "Current" && !etaTimeStamp) {
+        buttonDescription = "Complete mission"
+    } 
+    else if (etaTimeStamp) {
+        // We have an eta for this button
+        buttonDescription = `ETA: ${getMissionEtaString(etaTimeStamp)}`;
+    }
+
+    let missionButton = `<button id="button-${mission.Id}" class="btn ${buttonClass}" onclick="clickMission('${mission.Id}')" title="${buttonDescription}">${describeMission(mission)}</button>`
     
-    return `<span class="altEmptySpan"></span><button id="button-${mission.Id}" class="btn ${buttonClass}" onclick="clickMission('${mission.Id}')" title="${buttonDescription}">${describeMission(mission)}</button><a href="javascript:void(0);" class="infoButton resourceIcon altMissionButton ${groupClass} ml-1" onclick="switchToNextAbGroup('${mission.Id}')" title="${groupTitleText}">&nbsp;</a><a href="#" class="infoButton ${rewardImageClasses} resourceIcon ml-1" data-toggle="modal" data-target="#infoPopup" data-mission="${mission.Id}" title="Click for mission info/calc">&nbsp;</a>`;
-  } else {
-    return `<button id="button-${mission.Id}" class="btn ${buttonClass}" onclick="clickMission('${mission.Id}')" title="${buttonDescription}">${describeMission(mission)}</button><a href="#" class="infoButton ${rewardImageClasses} resourceIcon ml-1" data-toggle="modal" data-target="#infoPopup" data-mission="${mission.Id}" title="Click for mission info/calc">&nbsp;</a>`;
-  }
+    let rewardImageClasses = (rank != "Completed" && rank != "Current") ? "disabled " : ""
+    let rewardType = mission.Reward.Reward
+    let rewardId = mission.Reward.RewardId
+    let rewardIconSrc = ""
+
+    if (rewardType == "Gacha") {
+        // Place the ring around reward icon to indicate it's scripted
+        let scriptIdSearch = getData().GachaScripts.filter(x => x["GachaId"] == rewardId)
+        let isScripted = (scriptIdSearch.length != 0)
+        rewardImageClasses += isScripted ? " scriptedRewardInfo" : ""
+
+        let rewardGachaId = isScripted ? scriptIdSearch[0]["MimicGachaId"] : rewardId
+        rewardIconSrc = `img/shared/gacha/${rewardGachaId}.png`
+    }
+    else if (rewardType == "Resources") {
+        if (rewardId == 'gold') {
+            rewardIconSrc = 'img/shared/gold.png';
+        }
+        else if (rewardId.includes('timehack_')) {
+            rewardIconSrc = `img/shared/timewarps/${rewardId}.png`
+        }
+        else {
+            // Luckily this only occurs for Motherland rewards
+            // Must need to have a method of implementing for events in the future somehow
+            // ('GetCurrentTheme()' ?)
+            rewardIconSrc = `img/main/${rewardId}.png`
+        }
+    }
+
+    let rewardButton = `<a href="javascript:void(0);" style="background-image:url('${rewardIconSrc}')" class="infoButton ${rewardImageClasses} resourceIcon ml-1" data-toggle="modal" data-target="#infoPopup" data-mission="${mission.Id}" title="Click for mission info/calc">&nbsp;</a>`
+    
+    let ABButton = ``
+    if ("AbTestConfig" in mission) {
+        let splitGroupId = mission.AbTestConfig.split("|");
+        let testName = splitGroupId[0];
+        let groupName = splitGroupId[1];
+        
+        let groupMap = getAvailableAbTestGroups();
+        let groupsForTest = groupMap[testName];
+        let groupIndex = groupsForTest.indexOf(groupName);
+        
+        let groupClass = `altGroup-${groupIndex}`;
+        let nextGroupIndex = (groupIndex + 1) % groupsForTest.length;
+        let nextGroupName = groupsForTest[nextGroupIndex];
+        let groupTitleText = `Switch from ${mission.AbTestConfig} to alternate mission group ${testName}|${nextGroupName}`;
+
+        ABButton = `<a href="javascript:void(0);" class="infoButton resourceIcon altMissionButton ${groupClass} ml-1" onclick="switchToNextAbGroup('${mission.Id}')" title="${groupTitleText}">&nbsp;</a>`
+    }
+
+    return missionButton + ABButton + rewardButton
 }
 
 // Returns the css class(es) of the reward associated with a given mission
@@ -1643,50 +1687,84 @@ function describeMission(mission, overrideIcon = "") {
 
 // Given a root.Missions.Reward object, return an html string describing the reward (almost always a gacha capsule with gold + science + researchers).
 function describeReward(reward) {
-  if (reward.Reward == "Resources") {
-    return `${bigNum(reward.Value)} ${resourceName(reward.RewardId)}`;
-  
-  } else if (reward.Reward == "Gacha") {
-    let gacha = getData().GachaLootTable.find(g => g.Id == reward.RewardId);
-    if (!gacha) { return `Unknown gacha reward id: ${reward.RewardId}`; }
-    
-    if (gacha.Type == "Scripted") {
-      let script = getData().GachaScripts.find(s => s.GachaId == gacha.Id);
-      if (!script) { return `Unknown gacha script id: ${gacha.Id}`; }      
-            
-      let gold = script.Gold ? `${script.Gold} ${resourceName('gold')}` : null;
-      let scienceIcon = (currentMode == "main") ? "science" : "darkscience";
-      let science = script.Science ? `${script.Science}<span class="resourceIcon ${scienceIcon}">&nbsp;</span>` : null;      
-      let cards = script.Card.map(card => `<span class="text-nowrap">${cardValueCount(card)}${describeResearcher(getData().Researchers.find(r => r.Id == card.Id))}</span>`).join(', ') || null;
-      
-      let rewards = [gold, science, cards].filter(x => x != null).join('. ');
-      return `Scripted <span class="capsule ${script.MimicGachaId}">&nbsp;</span>: ${rewards}`;
-    } else {
-      return `Random <span class="capsule ${reward.RewardId}">&nbsp;</span>`;
+    if (reward.Reward == "Resources") {
+        return describeRewardIndividual(reward);
     }
-    
-  } else {    
+
+    if (reward.Reward == "Gacha") {
+        let gachaData = getData().GachaLootTable.find(g => g.Id == reward.RewardId);
+        if (!gachaData) { return `Unknown gacha reward id: ${reward.RewardId}`; }
+
+        if (gachaData.Type != "Scripted") { return `Random <span class="capsule ${reward.RewardId}">&nbsp;</span>` }
+
+        let script = getData().GachaScripts.find(s => s.GachaId == gachaData.Id);
+        if (!script) { return `Unknown gacha script id: ${gacha.Id}`; }   
+
+        let gold = script.Gold ? `<li>${describeRewardIndividual({"RewardId":"gold", "Value": script.Gold})}</li>` : ''
+        let science = script.Science ? `<li>${describeRewardIndividual({"RewardId":"science", "Value": script.Science})}</li>` : ''
+        
+        let cards = ``
+        script.Card.forEach(card => {
+            let researcher = getData().Researchers.find(r => r.Id === card.Id);
+            cards += `<li><span class="text-nowrap">${cardValueCount(card)}${describeResearcher(researcher)}</span></li>`;
+        })
+        
+        let scriptRewards = gold + science + cards
+        return `Scripted <span class="capsule ${script.MimicGachaId}">&nbsp;</span>:<ul>${scriptRewards}</ul>`;
+    }
+   else {    
     return `Unknown reward: ${reward.Reward}`;
-  }
+   }
+}
+
+function describeRewardIndividual(reward) {
+    if (reward.RewardId === 'science' || reward.RewardId === 'scientist') {
+        let resourceId = (currentMode === 'main') ? 'science' : 'darkscience';
+        let resourceDisplayName = (currentMode === 'main') ? resourceName('scientist') : resourceName(resourceId);
+        return `${bigNum(reward.Value)}<span class="resourceIcon ${resourceId}">&nbsp;</span>${resourceDisplayName}`;
+    }
+
+    return `${bigNum(reward.Value)}${getRewardIcon(reward, true)}${resourceName(reward.RewardId)}`;
 }
 
 // Given a SCHEDULE_CYCLES.LteRewards.Rewards[i] object, return an html string representing the reward as a small icon.
 function getRewardIcon(reward, imageOnly = false) {
-  let fileName = reward.RewardId;
+    let { Reward, RewardId, Value } = reward; 
+    let imgPath = "";
   
-  if (reward.Reward == "Gacha") {
-    fileName = `capsule-${reward.RewardId}`;
-  } else if (reward.Reward == "Researcher") {
-    fileName = `card-${reward.RewardId}`;
-  }
+    switch (Reward) {
+      case "Gacha": 
+        imgPath = `img/shared/gacha/${RewardId}`; 
+        break;
+      
+      case "Researcher": 
+        imgPath = `img/shared/card/card-${RewardId}`; 
+        break;
+        
+      default:
+        if (RewardId.includes('timehack')) {
+          imgPath = `img/shared/timewarps/${RewardId}`;
+        }
+        else if (RewardId == 'gold') {
+          imgPath = `img/shared/gold`;
+        }
+        else {
+          imgPath = `img/main/${RewardId}`;
+        }
+        break;
+    }
   
-  let imgHtml = `<img class='mx-1 rewardIcon' src='img/main/${fileName}.png'>`;
+    let imgHtml = `<img class='mx-1 rewardIcon' src='${imgPath}.png'>`
+    if (imageOnly || Reward == "Gacha") {
+      return imgHtml;
+    }
   
-  if (imageOnly || reward.Reward == "Gacha") {
-    return imgHtml;
-  } else {
-    return `<span class='rewardIconWrapper'>${imgHtml}<span class='rewardIconText'>${bigNum(reward.Value, 1000, 2)}</span></span>`;
-  }
+    let stagedRewardValue = Value;
+    if (typeof stagedRewardValue === 'string') {
+      stagedRewardValue = parseInt(stagedRewardValue.replace(',', ''));
+    }
+  
+    return `<span class='rewardIconWrapper'>${imgHtml}<span class='rewardIconText'>${bigNum(stagedRewardValue, 1000, 2)}</span></span>`;
 }
 
 // Given a root.Researchers object, returns an html string with a clickable version of their name with a popover description.
@@ -2093,7 +2171,8 @@ function getModeKey(mode) {
 }
 
 function getData() {
-  return DATA[currentMode];
+  const evergreenSwitch = currentMode === "main" ? "evergreen" : currentMode;
+  return DATA[evergreenSwitch];
 }
 
 /**** AB TEST STUFF ****/
@@ -2372,30 +2451,16 @@ function getBalanceInfoPopup() {
 
   // airdrop totals (ad and non-ad)
   for (let i of getData()['AirDrops']) {
-    let airdropType;
-    let adStatus;
-
-    switch (i['AirDropRewardType']) {
-      case 'CoreResource':
-        airdropType = "Random Resource";
-        break;
-      case 'PrimaryCurrency':
-        airdropType = resourceName('comrade');
-        break;
-      case 'SoftCurrency':
-        airdropType = resourceName('darkscience');
-        break;
-      case 'HardCurrency':
-        airdropType = resourceName('gold');
-        break;
+    
+    let airdropIdNames = {
+      'CoreResource': "Random Resource",
+      'PrimaryCurrency': resourceName('comrade'),
+      'SoftCurrency': resourceName('darkscience'),
+      'HardCurrency': resourceName('gold')
     }
-
-    if (i['IsAd']) {
-      adStatus = `${i['MaxAdsPerInterval']} ads per cycle`;
-    } else {
-      adStatus = 'non-ad';
-    }
-
+    
+    let airdropType = airdropIdNames[i['AirDropRewardType']];
+    let adStatus = i['IsAd'] ? `${i['MaxAdsPerInterval']} ads per cycle` : 'non-ad';
     let weight = `${i['Weight']}%`;
 
     let airdropLine = `<li>${airdropType} (${adStatus}; ${weight} weight)</li>`;
@@ -2406,66 +2471,90 @@ function getBalanceInfoPopup() {
   for (let i of getData()['Store']) {
     if (i['ItemClass'] === 'VirtualCurrencyBundle') {
       // check if "Scheduled"
-      let _continue = true;
+      let timeRange;
       
       if (getData()['ScheduledOffers']) {
         for (let j of getData()['ScheduledOffers']) {
           if (i['InternalId'] === j['ItemId']) {
-            // this is a scheduled offer; only display if in time period
-            let currentUnixTS = (new Date()).getTime() / 1000;
-            if (!(currentUnixTS >= j['StartDateTimestamp'] && currentUnixTS < j['EndDateTimestamp'])) {
-              _continue = false; // this is a nested loop, so we have to do some trickery.
-            }
+            let startTime = new Date(j['StartDateTimestamp'] * 1000)
+            let endTime = new Date(j['EndDateTimestamp'] * 1000)
+            timeRange = `Available ${startTime.toLocaleDateString()} ${startTime.toLocaleTimeString()} to ${endTime.toLocaleDateString()} ${endTime.toLocaleTimeString()}`;
           }
         }
       }
       
-      if (_continue) {
-        let name = i['Name'];
-        let price = `US$${(i['Price'] / 100).toFixed(2)}`;
-        totalPrice += i['Price'];
-        let rewardsString = "";
+      let name = i['Name'];
+      let nameEnhanced = timeRange ? `<a tabindex="0" class="researcherName" role="button" data-html="true" data-toggle="popover" data-placement="right" data-trigger="focus" data-content="${timeRange}">${name}</a>` : name
+      //nameEnhanced += ` [${i['InternalId']}]`; // for dev debugging
 
-        for (let j of i['Rewards']) {
-          // three reward types: "Gacha" (capsule), "Resources", and "Researcher"
-          let rewardContent = "";
+      let price = `US$${(i['Price'] / 100).toFixed(2)}`;
+      totalPrice += i['Price'];
+      let rewardsString = "";
 
-          switch (j['Reward']) {
-            case "Gacha":
-              let capsuleImage = j['RewardId']; 
-              if (currentMode !== "event") { capsuleImage = `capsule-${capsuleImage}` }
-              let capsuleImageUrl = `<img class='rewardIcon' src='img/${currentMode}/${capsuleImage}.png'>`
+      for (let j of i['Rewards']) {
+        // four reward types: "Gacha" (capsule), "Resources", "Researcher" and "Experiments" (blitz)
+        let rewardContent = "";
+        let rewardId = j['RewardId'];
 
-              rewardContent = `x${bigNum(j['Value'])} ${capsuleImageUrl} ${ENGLISH_MAP[`gacha.${j['RewardId']}.name`]} Capsule`;
-              break;
-            case "Resources":
-              let resourceImageUrl = "";
-              if (j['RewardId'] === 'darkscience') {
-                resourceImageUrl = "<img class='rewardIcon' src='img/event/darkscience.png'>";
-              } else if (j['RewardId'] === 'gold') {
-                resourceImageUrl = "<img class='rewardIcon' src='img/main/gold.png'>";
-              } else if (j['RewardId'] === 'scientist') {
-                resourceImageUrl = "<img class='rewardIcon' src='img/main/scientist.png'>";
-              }
-              
-              let resourcePlurality = (j['Value'] === 1) ? "singular" : "plural"
-              rewardContent = `x${bigNum(j['Value'])} ${resourceImageUrl} ${ENGLISH_MAP[`resource.${j['RewardId']}.${resourcePlurality}`]}`;
-              break;
-            case "Researcher":
-              let rewardId = j['RewardId']
-              let researcherInfo = `<span class="text-nowrap">${describeResearcher(getData().Researchers.find(r => r.Id == rewardId), "right")}</span>`
-              rewardContent = `x${bigNum(j['Value'])}${researcherInfo}`
-              break;
-            default:
-              rewardContent = 'Unknown Reward Type (please report this or check console for more information)';
-              console.warn(`Unknown Reward Type: ${JSON.stringify(j)}`);
-              break;
-          }
+        switch (j['Reward']) {
+          case "Gacha":
+            rewardId = rewardId.toLowerCase();
+            let capsuleImageUrl = `<img class='rewardIcon' src='img/shared/gacha/${rewardId}.png'>`
+            rewardContent = `x${bigNum(j['Value'])} ${capsuleImageUrl} ${ENGLISH_MAP[`gacha.${rewardId}.name`]} Capsule`;
+          break;
 
-          rewardsString += `<li>${rewardContent}</li>`
+          case "Resources":
+            rewardId = rewardId.toLowerCase();
+
+            let resourcePlurality = (j['Value'] === 1) ? "singular" : "plural"
+            let resourceName = ENGLISH_MAP[`resource.${rewardId}.${resourcePlurality}`];
+
+            let resourceFixedUrls = {
+              'scientist': 'img/main/scientist',
+              'darkscience': 'img/event/darkscience',
+              'gold': 'img/shared/gold'
+            };
+            
+            let resourceImageUrl;
+            if (rewardId in resourceFixedUrls) {
+              resourceImageUrl = resourceFixedUrls[rewardId];
+            }
+            else if (rewardId.includes('timehack')) {
+              resourceImageUrl = `img/shared/timewarps/${rewardId}`;
+              resourceName = `<a tabindex="0" class="researcherName" role="button" data-html="true" data-toggle="popover" data-placement="top" data-trigger="focus" data-content="${getTimewarpPopup(rewardId)}">${resourceName}</a>`
+            }
+
+            let resourceImage = `<img class='rewardIcon' src='${resourceImageUrl}.png'>`;
+            rewardContent = `x${bigNum(j['Value'])} ${resourceImage} ${resourceName}`;
+          break;
+
+          case "Researcher":
+            let researcherInfo = `<span class="text-nowrap">${describeResearcher(getData().Researchers.find(r => r.Id == rewardId), "right")}</span>`
+            rewardContent = `x${bigNum(j['Value'])}${researcherInfo}`
+          break;
+
+          case "Experiment":
+            // As of writing, this will never run on Ages
+            // Blitz IDs seem to be hard coded, so we can hardcode these
+            let blitzIdUrl = {
+              "EX180": "blitz-mini",
+              "EX181": "blitz-standard",
+              "EX182": "blitz-mega"
+            };
+            
+            let experimentImageUrl = `<img class='rewardIcon' src='img/shared/blitz/${blitzIdUrl[rewardId]}.png'>`;
+            rewardContent = `x${bigNum(j['Value'])} ${experimentImageUrl} ${ENGLISH_MAP[`experiment.${rewardId}.name`]}`;
+          break;
+
+          default:
+            rewardContent = 'Unknown Reward Type (please report this or check console for more information)';
+            console.warn(`Unknown Reward Type: ${JSON.stringify(j)}`);
+          break;
         }
-        packs += `<li>${name} (${price})<ul>${rewardsString}</ul></li>`;
+
+        rewardsString += `<li>${rewardContent}</li>`
       }
+      packs += `<li>${nameEnhanced} (${price})<ul>${rewardsString}</ul></li>`;
     }
   }
 
@@ -2506,6 +2595,22 @@ function getBalanceInfoPopup() {
       <p><strong>Total Cost: </strong>US$${(totalPrice / 100).toFixed(2)}</p>
     </fieldset>
   `
+}
+
+function getTimewarpPopup(timewarpId) {
+  let imageDirectory = `img/shared/timewarps/${timewarpId}.png`;
+  let html = `
+  <img class='resourceIcon mr-1' src='${imageDirectory}'>${ENGLISH_MAP[`resource.${timewarpId}.singular`]}<br />
+  <b>Duration: </b>${ENGLISH_MAP[`store.${timewarpId}.name`]}<br />`;
+
+  let storeWarp = getData()["Store"].filter(item => item['InternalId'] === timewarpId);
+  if (storeWarp.length == 1) {
+    let warpPrice = storeWarp[0]["Price"];
+    let goldHtml = `<img class='mx-1 rewardIcon' src='img/shared/gold.png'>`
+    html += `<b>Cost: </b>${goldHtml}${warpPrice}<br />`;
+  }
+
+  return html;
 }
 
 function getAllIndustryPopup() {
