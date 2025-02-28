@@ -782,7 +782,7 @@ function loadSaveData() {
   setIcons(iconConfig, false);
   
   let styleConfig = getGlobal("StyleConfig") || "light";
-  setStyle(styleConfig);
+  //setStyle(styleConfig);
   
   setListStyle(isListActive(), false);
   
@@ -1969,35 +1969,27 @@ function toggleIconsStyle() {
   }
 }
 
-var StylesheetUrls = {
-  light: "https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css",
-  dark: "https://stackpath.bootstrapcdn.com/bootswatch/4.3.1/cyborg/bootstrap.min.css"
-};
 
-// Run whenever the style setting changes (OnClick) or is initialized.
-function setStyle(styleType) {
-  setGlobal('StyleConfig', styleType);
-  
-  $('#config-style-dark').removeClass('active');
-  if (styleType == "dark") {
-    $('#config-style-dark').addClass('active');
-  }
-  
-  if (styleType in StylesheetUrls) {
-    $('#stylesheet').attr('href', StylesheetUrls[styleType]);
-    
-    let styleIds = Object.keys(StylesheetUrls).join(" ");
-    $('#body').removeClass(styleIds).addClass(styleType);
-  }  
+// Run OnClick for the list style option.
+function toggleListStyle() {
+    let currentListStyle = getGlobal('ListStyleActiveConfig');
+    setListStyle(!(currentListStyle == "true"));
 }
 
-function toggleDarkStyle() {
-  let currentStyle = getGlobal('StyleConfig');
-  if (currentStyle == 'dark') {
-    setStyle('light');
-  } else {
-    setStyle('dark');
-  }
+// Run whenever the list style option changes (OnClick) or is initialized.
+function setListStyle(isListActive, shouldRenderMissions = true) {
+    setGlobal('ListStyleActiveConfig', isListActive);
+
+    if (isListActive) {
+        $('#config-style-list').addClass('active');
+    } 
+    else {
+        $('#config-style-list').removeClass('active');
+    }
+
+    if (shouldRenderMissions) {
+        renderMissions();
+    }
 }
 
 // Run OnClick for the list style option.
@@ -3018,45 +3010,35 @@ function getFirstMissionWithScriptedReward(researcher) {
 
 // Returns html for the researchers sub-tab where you input researcher levels.
 function getResearchersTab(mission, industryId) {
-  let html = `
-    <div class="container">
-      <div class="row">`;
-  
-  let formValues = getFormValuesObject();
-  
-  let researchers = getResearchersByIndustry(industryId);
-  sortResearchers(researchers);
-  
-  // This is a huge hack until I figure out a better, more responsive way of handling this.
-  // If innerWidth is too small (e.g., a phone) only do two columns per row.
-  let columnsPerRow = (window.innerWidth > 450) ? 3 : 2;
-  
-  // Make rows with 2-3 researchers per row and end each one with a row-ending div.
-  let columnsLeft = columnsPerRow;  
-  for (let researcher of researchers) {
-    html += `<div class="col mt-3">${getResearcherCard(researcher, formValues)}</div>`;
-    
-    if (columnsLeft == 1) {
-      html += '<div class="w-100"></div>';
-      columnsLeft = columnsPerRow;
-    } else {
-      columnsLeft -= 1;
+    return getResearcherGridHtml(getResearchersByIndustry(industryId));
+}
+
+function getResearcherGridHtml(researchers, includePropeganda = true) {
+    let html = ``;
+    let formValues = getFormValuesObject();
+    sortResearchers(researchers);
+
+    // Add researchers to the grid
+    for (let researcher of researchers) {
+        html += `
+            <div class="researcherGridItem">
+                ${getResearcherCard(researcher, formValues)}
+            </div>
+        `;
     }
-  }
-  
-  // Add an additional PropagandaBoost pseudo-researcher.
-  html += `<div id="propBoostCol" class="col mt-3">${getPropagandaBoostCard(formValues)}</div>`;
-  columnsLeft -= 1;
-  
-  // Finish out the columns to be a multiple of columnsPerRow
-  if (columnsLeft != 0) {
-    html += '<div class="col mt-1"></div>'.repeat(columnsLeft);
-  }
-  
-   html += `
-      </div>
-    </div>`;
-  return html;
+
+    // Add an additional PropagandaBoost pseudo-researcher.
+    if (includePropeganda) {
+        html += `<div id="propBoostCol" class="researcherGridItem">${getPropagandaBoostCard(formValues)}</div>`;
+    }
+
+    return `
+        <div class="container">
+            <div class="row">
+                ${html}
+            </div>
+        </div>
+    `;
 }
 
 // Maybe find a better way to do this at some point?
@@ -3215,24 +3197,25 @@ function getResearcherCard(researcher, formValues) {
   
   return `
     <a tabindex="0" class="researcherName" role="button" data-toggle="popover" data-placement="top" data-trigger="focus" data-title="${popupTitle}" data-content="${popupBody}" data-html="true">
-      <div class="researcherCard ${rarityClass} mx-auto" style="background-image: url('${imgDirectory}/${researcher.Id}.png');">
-        <div class="researcherIcon float-right" style="background-image: url('${targetIconUrl}');">&nbsp;</div>
-        <div id="${researcher.Id}-level" class="researcherLevel text-center">${levelString}</div>
+        <div class="researcherCard ${rarityClass} mx-auto" style="background-image: url('${imgDirectory}/${researcher.Id}.png');">
+            <div class="researcherIcon float-right" style="background-image: url('${targetIconUrl}');">&nbsp;</div>
+            <div id="${researcher.Id}-level" class="researcherLevel text-center">${levelString}</div>
       </div>
     </a>
 
-    <div class="my-2 text-center">
-      <div id="${researcher.Id}-down-button" class="${downVisibilityClass} float-left researcherLevelButton ${downColorClass}">
-        <a onclick="clickLevelResearcher('${researcher.Id}', ${level - 1})" role="button" title="${downTitle}">${downLabel}</a>
-      </div>
-      
-      
-      <div class="resourceIcon ${researcher.ModType}">&nbsp;</div>
-      <span id="${researcher.Id}-value">${valueString}</span>
-      
-      <div id="${researcher.Id}-up-button" class="${upVisibilityClass} researcherLevelButton float-right text-success">
-        <a onclick="clickLevelResearcher('${researcher.Id}', ${level + 1})" role="button" title="Level ${researcherName(researcher)} up to ${level + 1}">&#x25B2;</a>
-      </div>
+    <div class="center" style="margin-top: 10px">
+            <div id="${researcher.Id}-down-button" class="${downVisibilityClass} float-left researcherLevelButton ${downColorClass}">
+                <a onclick="clickLevelResearcher('${researcher.Id}', ${level - 1})" role="button" title="${downTitle}">${downLabel}</a>
+            </div>
+        
+        <div style="padding: 0px 20px; display:inline; white-space: nowrap;">
+            <div class="resourceIcon ${researcher.ModType}">&nbsp;</div>
+            <span id="${researcher.Id}-value">${valueString}</span>
+        </div>
+        
+        <div id="${researcher.Id}-up-button" class="${upVisibilityClass} researcherLevelButton float-right text-success">
+            <a onclick="clickLevelResearcher('${researcher.Id}', ${level + 1})" role="button" title="Level ${researcherName(researcher)} up to ${level + 1}">&#x25B2;</a>
+        </div>
     </div>`;
 }
 
@@ -3256,14 +3239,15 @@ function getPropagandaBoostCard(formValues) {
         <div class="researcherLevel text-center">${levelText}</div>
       </div>
 
-      <div class="my-2 text-center">
+      <div class="center" style="margin-top: 8px">
         <div class="${downVisibilityClass} float-left researcherLevelButton text-danger">
           <a onclick="clickChangePropagandaBoost(0)" role="button" title="Disable Propaganda Boost">&#x25BC;</a>
         </div>
         
-        
-        <div class="resourceIcon power">&nbsp;</div>
-        ${valueString}
+        <div style="padding: 0px 20px;">
+            <div class="resourceIcon power">&nbsp;</div>
+            ${valueString}
+        </div>
         
         <div class="${upVisibilityClass} researcherLevelButton float-right text-success">
           <a onclick="clickChangePropagandaBoost(1)" role="button" title="Enable Propaganda Boost">&#x25B2;</a>

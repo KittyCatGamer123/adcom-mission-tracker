@@ -1,0 +1,168 @@
+:root {
+    --background-colour: #191919;
+    --forground-colour: #202020;
+    --border-colour: #383838;
+    --button-background-colour: #333333;
+    --divider-colour: #5a5a5a;
+
+    --primary-text-colour: #e9e9e9;
+    --link-text-colour: rgb(93, 171, 255);
+    --link-text-hover-colour: rgb(10, 96, 189);
+
+    --success-colour: rgb(92, 185, 114);
+    --success-dark-colour: #171f18;
+    --danger-colour: rgb(255, 88, 105);
+    --danger-dark-colour: #201a1a;
+}
+
+body,
+button {
+    background-color: var(--background-colour);
+    color: var(--primary-text-colour);
+}
+
+.dropdown-item,
+.modal-close-icon,
+tr {
+    color: var(--primary-text-colour);
+}
+
+.card {
+    border-color: var(--border-colour);
+}
+
+.card-header,
+.card-body,
+.modal-header,
+.modal-body,
+.popover,
+.popover-header,
+.popover-body,
+.dropdown-menu {
+    background-color: var(--forground-colour) !important;
+    color: var(--primary-text-colour);
+    border: solid 1px var(--border-colour);
+}
+
+.card-header,
+.modal-header {
+    border-bottom-color: var(--border-colour);
+}
+
+.navbar {
+    background-color: rgb(28, 37, 48) !important;
+}
+
+a,
+.infoButton {
+    color: var(--link-text-colour);
+    text-decoration: var(--link-text-colour);
+}
+
+a:hover,
+.infoButton:hover {
+    color: var(--link-text-hover-colour);
+}
+
+hr,
+.dropdown-divider {
+    border-color: var(--divider-colour);
+}
+
+.nav-tabs {
+    color: var(--link-text-colour);
+    border-bottom-color: var(--divider-colour);
+}
+
+.nav-link:hover {
+    background-color: var(--forground-colour) !important;
+    border-color: var(--divider-colour) !important;
+    color: var(--link-text-hover-colour) !important;
+}
+
+.nav-link.active {
+    background-color: var(--forground-colour) !important;
+    border-color: var(--divider-colour) !important;
+    color: var(--primary-text-colour) !important;
+}
+
+.nav-link.dropdown-toggle:hover {
+    background-color: rgba(0, 0, 0, 0) !important;
+    color: var(--primary-text-colour) !important;
+}
+
+.popover-header {
+    border-bottom-color: var(--divider-colour);
+}
+
+.popover p {
+    color: var(--primary-text-colour);
+}
+
+.scheduleHeader.selected {
+    background-color: var(--button-background-colour);
+}
+
+.active-checkbox {
+    border: 1px solid var(--primary-text-colour) !important;
+}
+
+.btn-secondary {
+    background-color: var(--background-colour);
+    border-color: var(--border-colour);
+}
+
+.btn-secondary:hover {
+    background-color: var(--forground-colour);
+}
+
+.btn-outline-secondary,
+.input-group input,
+.input-group-text {
+    background-color: var(--button-background-colour);
+    color: var(--primary-text-colour);
+}
+
+.input-group input:focus {
+    background-color: var(--background-colour);
+    color: var(--primary-text-colour);
+}
+
+.btn-outline-secondary.disabled {
+    color: var(--primary-text-colour);
+}
+
+.btn-outline-secondary:hover {
+    border-color: var(--primary-text-colour);
+    background-color: var(--background-colour);
+}
+
+.btn-success {
+    background-color: var(--success-dark-colour);
+    color: var(--primary-text-colour);
+}
+
+.btn-outline-success {
+    background-color: var(--success-dark-colour);
+    border-color: var(--success-colour);
+    color: var(--success-colour);
+}
+
+.btn-outline-success.disabled {
+    background-color: var(--success-dark-colour);
+}
+
+.btn-danger {
+    background-color: var(--danger-dark-colour);
+    color: var(--primary-text-colour);
+}
+
+.btn-outline-danger {
+    background-color: var(--danger-dark-colour);
+    border-color: var(--danger-colour);
+    color: var(--danger-colour);
+}
+
+.btn-outline-danger.disabled {
+    background-color: var(--danger-dark-colour);
+}
