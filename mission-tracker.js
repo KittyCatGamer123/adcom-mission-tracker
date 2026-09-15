@@ -701,6 +701,7 @@ function initializeMainMissionData() {
 // Manually initializes popups and popovers, since Bootstrap requires it.
 function initializePopups() {
   /* Based on code from https://getbootstrap.com/docs/4.0/components/modal/ */
+
   $('#infoPopup').on('show.bs.modal', function (event) {
     let button = $(event.relatedTarget); // Button that triggered the modal
     let missionId = button.data('mission'); // Extract info from data-* attributes
@@ -719,7 +720,8 @@ function initializePopups() {
     if (missionId in missionEtas) {
       modal.find('#lastEtaContainer').addClass('show');
       modal.find('#lastEta').text(getMissionEtaString(missionEtas[missionId]));
-    } else {
+    } 
+    else {
       modal.find('#lastEtaContainer').removeClass('show');
     }
     
@@ -729,7 +731,8 @@ function initializePopups() {
       
       // If it's completed, we don't need to also show an eta.
       modal.find('#lastEtaContainer').removeClass('show');
-    } else {
+    } 
+    else {
       modal.find('#completionTimeContainer').removeClass('show');
     }
     
@@ -738,90 +741,14 @@ function initializePopups() {
       updateImportButton();
     });
   });
-  
-  $('#balanceInfoPopup').on('show.bs.modal', function () {
-    // Fill in the body
-    let modal = $(this);
-    modal.find('#balanceInfoPopupBody').html(getBalanceInfoPopup());
-  });
 
-  $('#scriptedGachaTablePopup').on('show.bs.modal', function (event) {
-    let button = $(event.relatedTarget); // Button that triggered the modal
-    let activeTabId = button.data('tab'); // Extract info from data-* attributes
-    
-    // Fill in the body
-    let modal = $(this);
-    modal.find('#scriptedGachaTableBody').html(getScriptedCapsulesPopup());
-    
-    // Set the correct tab to be active based on which button launched the popup.
-    let activeTab = modal.find(`#${activeTabId}`);
-    activeTab.addClass('active');
-    activeTab.attr('aria-selected', 'true');
-    
-    modal.find(`[aria-labelledby="${activeTabId}"]`).addClass('show active');
-    
-    $(function () {
-      $('[data-toggle="popover"]').popover();
-    });
-  });
-  
-  $('#airdropTablePopup').on('show.bs.modal', function () {
-    // Fill in the body
-    let modal = $(this);
-    modal.find('#airdropTablePopupBody').html(getAirdropTablePopup());
-  });
-  
-  $('#capsuleTablePopup').on('show.bs.modal', function () {
-    // Fill in the body
-    let modal = $(this);
-    modal.find('#capsuleTablePopupBody').html(getCapsuleTablePopup());
-  });
-  
-  $('#allInfoPopup').on('show.bs.modal', function (event) {
-    let button = $(event.relatedTarget); // Button that triggered the modal
-    let activeTabId = button.data('tab'); // Extract info from data-* attributes
-    
-    // Fill in the body
-    let modal = $(this);
-    modal.find('#allInfoPopupBody').html(getAllIndustryPopup());
-    
-    // Set the correct tab to be active based on which button launched the popup.
-    let activeTab = modal.find(`#${activeTabId}`);
-    activeTab.addClass('active');
-    activeTab.attr('aria-selected', 'true');
-    
-    modal.find(`[aria-labelledby="${activeTabId}"]`).addClass('show active');
-    
-    $(function () {
-      $('[data-toggle="popover"]').popover();
-    });
-  });
-  
-  $('#schedulePopup').on('show.bs.modal', function (event) {
-    // Fill in the body
-    let modal = $(this);
-    modal.find('#schedulePopupBody').html(getSchedulePopup());
-    
-    $(function () {
-      $('[data-toggle="popover"]').popover();
-    });
-  });
-  
-  $('#eventBalancePopup').on('show.bs.modal', function (event) {
-    // Fill in the body
-    let modal = $(this);
-    modal.find('#eventBalanceBody').html(getAllEventBalanceHtml());
-    
-    $(function () {
-      $('[data-toggle="popover"]').popover();
-    });
-  });
-
-  $('#balanceInfoPopup').on('show.bs.modal', function (event) {
-    $(function () {
-      $('[data-toggle="popover"]').popover();
-    });
-  });
+  applyBodyToPopup('allInfoPopup', getAllIndustryPopup, togglePopover=true, usesTabs=true);
+  applyBodyToPopup('scriptedGachaTablePopup', getScriptedCapsulesPopup, togglePopover=true, usesTabs=true);
+  applyBodyToPopup('balanceInfoPopup', getBalanceInfoPopup, togglePopover=true);
+  applyBodyToPopup('airdropTablePopup', getAirdropTablePopup);
+  applyBodyToPopup('capsuleTablePopup', getCapsuleTablePopup);
+  applyBodyToPopup('schedulePopup', getSchedulePopup, togglePopover=true);
+  applyBodyToPopup('eventBalancePopup', getAllEventBalanceHtml, togglePopover=true);
   
   $('#rankPopupBody').html(getRankAdvanceHtml());
   $('#dataPopupBody').html(getDataManagementHtml());
@@ -831,6 +758,34 @@ function initializePopups() {
   $('#rankAdvanceConfirm').click(function() {
     advanceProgressTo();
   });
+}
+
+function applyBodyToPopup(elementReference, htmlBodyFunc, togglePopover = false, usesTabs = false) {
+    $(`#${elementReference}`).on('show.bs.modal', function (event) {
+        if (htmlBodyFunc) {
+            // Fill in the body
+            let modal = $(this);
+            modal.find(`#${elementReference}Body`).html(htmlBodyFunc());
+
+            if (usesTabs) {
+                let button = $(event.relatedTarget); // Button that triggered the modal
+                let activeTabId = button.data('tab'); // Extract info from data-* attributes
+
+                // Set the correct tab to be active based on which button launched the popup.
+                let activeTab = modal.find(`#${activeTabId}`);
+                activeTab.addClass('active');
+                activeTab.attr('aria-selected', 'true');
+        
+                modal.find(`[aria-labelledby="${activeTabId}"]`).addClass('show active');
+            }
+        }
+
+        if (togglePopover) {
+            $(function () {
+                $('[data-toggle="popover"]').popover();
+            });
+        }
+    });
 }
 
 function initializeInputHandlers() {
@@ -3270,9 +3225,11 @@ function describeGenerator(generator, researchers, formValues) {
   let industry = getData().Industries.find(i => i.Id == generator.IndustryId);
   if (generator.Unlock.Threshold > 0 || industry.UnlockCostResourceQty > 0) {
     html += `<br /><br /><strong>Unlocks at:</strong><br />`;
+
     if (generator.Unlock.Threshold > 0 && generator.Unlock.ConditionType != "IndustryUnlocked") {
       html += `<img class='resourceIcon mr-1' src='${imgDirectory}/${generator.Unlock.ConditionId}.png' title='${resourceName(generator.Unlock.ConditionId)}'>${bigNum(generator.Unlock.Threshold)}`;
-    } else {
+    } 
+    else {
       html += `<img class='resourceIcon mr-1' src='${imgDirectory}/${industry.UnlockCostResourceId.toLowerCase()}.png' title='${resourceName(industry.UnlockCostResourceId.toLowerCase())}'>${bigNum(industry.UnlockCostResourceQty)}`;
     }
   }
@@ -3322,7 +3279,8 @@ function getResearchersTab(mission, industryId) {
     if (columnsLeft == 1) {
       html += '<div class="w-100"></div>';
       columnsLeft = columnsPerRow;
-    } else {
+    } 
+    else {
       columnsLeft -= 1;
     }
   }

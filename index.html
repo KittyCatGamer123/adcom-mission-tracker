@@ -131,6 +131,12 @@
 
     <ul class="navbar-nav ml-auto nav-right">
       <li class="nav-item">
+        <button type="button" id="viewSimulator" class="nav-btn nav-icon-btn" data-toggle="modal"
+          data-target="#simulatorPopup" title="View Simulator">
+          <img src="img/shared/speed.png">
+        </button>
+      </li>
+      <li class="nav-item">
         <button type="button" id="viewBalanceInfoButton" class="nav-btn nav-icon-btn" data-toggle="modal"
           data-target="#balanceInfoPopup" data-tab="balance-info-tab" title="View Balance Info">
           <img src="img/shared/themeicons/main.png">
@@ -296,7 +302,7 @@
           </button>
         </div>
         <div class="modal-body">
-          <div id="eventBalanceBody"></div>
+          <div id="eventBalancePopupBody"></div>
         </div>
       </div>
     </div>
@@ -360,7 +366,7 @@
           </button>
         </div>
         <div class="modal-body">
-          <div id="scriptedGachaTableBody"></div>
+          <div id="scriptedGachaTablePopupBody"></div>
         </div>
       </div>
     </div>
