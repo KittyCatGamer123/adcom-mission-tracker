@@ -1,3 +1,4 @@
+let IsEvent = false;
 let IsAges = false; // Have this at false for now, we'll deal with Ages later
 let ENGLISH_MAP = {}; // This gets filled in during mission.js's main(). After that, ENGLISH_MAP["active"] == "Active"
 
@@ -9,203 +10,211 @@ let missionData = {}; //  The main data structure used to store the current stat
 let missionCompletionTimes = {}; // Maps missionId's to when you completed them.  Can be viewed in the info popup of completed missions.
 
 function main() {
-  loadModeSettings();
-  initializeLocalization();
-  initializeAbTestGroups();
-  initializeMissionData();
-  initializePopups();
-  initializeInputHandlers();
-  applyIconCssVariables();
-  loadSaveData();
-  initializeIntervalFunctions();
-  renderMissions();
-  //finalSurveyConfigData();
+    loadModeSettings();
+    initializeLocalization();
+    initializeAbTestGroups();
+    initializeMissionData();
+    initializePopups();
+    initializeInputHandlers();
+    applyIconCssVariables();
+    loadSaveData();
+    initializeIntervalFunctions();
+    renderMissions();
+    //finalSurveyConfigData();
 }
 
 // Determines whether the page is in Main or Event mode, based on the url and save state.
 // If event, also determines the event (based on the current time and event schedule).
 function loadModeSettings() {
-  // URL PARAMETER OPTIONS:
-  // + (none)
-  //   -  Opens motherland or the current event, whichever was used last.
-  // + ?rank=X
-  //   -  X can be "event" (for current event), "main", or a motherland rank (1-MAX_RANK)
-  // + ?mode=X
-  //   -  X can be "event", "main", or "schedule" (intended to deprecate rank=X for these values)
-  // + ?event=X
-  //   -  X is any event's EndTime, in milliseconds from epoch UTC.
-  // + ?eventOverride=X
-  //   -  Mostly for testing, X is a balance id like "crusade-bal-1"
-  // + ?timeOverride=X
-  //   -  For testing. Sets to the event running at X (milliseconds from epoch UTC).
+    // URL PARAMETER OPTIONS:
+    // + (none)
+    //   -  Opens motherland or the current event, whichever was used last.
+    // + ?rank=X
+    //   -  X can be "event" (for current event), "main", or a motherland rank (1-MAX_RANK)
+    // + ?mode=X
+    //   -  X can be "event", "main", or "schedule" (intended to deprecate rank=X for these values)
+    // + ?event=X
+    //   -  X is any event's EndTime, in milliseconds from epoch UTC.
+    // + ?eventOverride=X
+    //   -  Mostly for testing, X is a balance id like "crusade-bal-1"
+    // + ?timeOverride=X
+    //   -  For testing. Sets to the event running at X (milliseconds from epoch UTC).
   
-  let now = Date.now();
-  
-  let splitUrl = window.location.href.split('#');
-  splitUrl = splitUrl[0].split('?');
-  
-  if (splitUrl.length == 2) {
-    let args = splitUrl[1].split('&');
+    let now = Date.now();
 
-    for (let arg of args) {
-      let keyValue = arg.split('=');
+    let splitUrl = window.location.href.split('#');
+    splitUrl = splitUrl[0].split('?');
+  
+    if (splitUrl.length == 2) {
+        let args = splitUrl[1].split('&');
 
-      if (keyValue.length != 2) {
-        continue;
-      }
-      
-      if (keyValue[0] == "rank") {
-        // Parse ?rank=X
-        
-        if (keyValue[1] == "event") {
-          setGameLocal("CurrentMode", "event");
-        } else if (keyValue[1] == "main") {
-          setGameLocal("CurrentMode", "main");
-        } else if (parseInt(keyValue[1])) {
-          setGameLocal("CurrentMode", "main");
-          setLocal("main", "CurrentRank", keyValue[1]);
+        for (let arg of args) {
+            let keyValue = arg.split('=');
+
+            if (keyValue.length != 2) {
+                continue;
+            }
+            
+            if (keyValue[0] == "rank") {
+                // Parse ?rank=X
+            
+                if (keyValue[1] == "event") {
+                    setGameLocal("CurrentMode", "event");
+                } 
+                else if (keyValue[1] == "main") {
+                    setGameLocal("CurrentMode", "main");
+                } 
+                else if (parseInt(keyValue[1])) {
+                    setGameLocal("CurrentMode", "main");
+                    setLocal("main", "CurrentRank", keyValue[1]);
+                }
+            
+            } 
+            else if (keyValue[0] == "mode") {
+                // Parse ?mode=X
+            
+                if (keyValue[1] == "event") {
+                    setGameLocal("CurrentMode", "event");
+                } else if (keyValue[1] == "main") {
+                    setGameLocal("CurrentMode", "main");
+                } else if (keyValue[1] == "schedule") {
+                    // Open the schedule popup when the page loads
+                    $(function() { $('#schedulePopup').modal(); })
+                }
+                
+            } 
+            else if (keyValue[0] == "event") {
+                // Parse ?event=
+                
+                // This is a lot like timeOverride, but more rigid
+                let eventTime = parseInt(keyValue[1]);
+                
+                // Test one millisecond before the end time.
+                // If right, the next event should end at that time.
+                let eventCandidate = getCurrentEventInfo(eventTime - 1);
+                if (eventCandidate.EndTimeMillis == eventTime) {
+                    eventScheduleInfo = eventCandidate;
+                    setGameLocal("CurrentMode", "event");
+                }
+            
+            } 
+            else if (keyValue[0] == "timeOverride") {
+                // Parse ?timeOverride=
+                
+                now = parseInt(keyValue[1]);
+                setGameLocal("CurrentMode", "event");
+                
+            } 
+            else if (keyValue[0] == "eventOverride"
+                        && keyValue[1] in DATA && keyValue[1] != "main") {
+                // Parse ?eventOverride=X
+                
+                // This is a quick hack to allow switching to non-current events.
+                setGameLocal("CurrentMode", "event");
+                DATA.event = DATA[keyValue[1]];
+                eventScheduleInfo = {
+                    LteId: keyValue[1],
+                    BalanceId: keyValue[1],
+                    ThemeId: keyValue[1].split('-')[0], // take the xxx part of xxx-bal-5
+                    StartTimeMillis: now,
+                    EndTimeMillis: now,
+                    Rewards: Array(20) // empty values, which the tracker handles gracefully
+                };
+                if (THEME_ID_OVERRIDES[keyValue[1]]) {
+                    eventScheduleInfo['ThemeId'] = THEME_ID_OVERRIDES[keyValue[1]];
+                }
+                $('#overrideWarning').addClass("show");
+                $('#alertReset').remove(); // don't show the Reset Alert ever in this mode.  Hacky.
+            }
         }
-        
-      } else if (keyValue[0] == "mode") {
-        // Parse ?mode=X
-        
-        if (keyValue[1] == "event") {
-          setGameLocal("CurrentMode", "event");
-        } else if (keyValue[1] == "main") {
-          setGameLocal("CurrentMode", "main");
-        } else if (keyValue[1] == "schedule") {
-          // Open the schedule popup when the page loads
-          $(function() { $('#schedulePopup').modal(); })
-        }
-        
-      } else if (keyValue[0] == "event") {
-        // Parse ?event=
-        
-        // This is a lot like timeOverride, but more rigid
-        let eventTime = parseInt(keyValue[1]);
-        
-        // Test one millisecond before the end time.
-        // If right, the next event should end at that time.
-        let eventCandidate = getCurrentEventInfo(eventTime - 1);
-        if (eventCandidate.EndTimeMillis == eventTime) {
-          eventScheduleInfo = eventCandidate;
-          setGameLocal("CurrentMode", "event");
-        }
-        
-      } else if (keyValue[0] == "timeOverride") {
-        // Parse ?timeOverride=
-        
-        now = parseInt(keyValue[1]);
-        setGameLocal("CurrentMode", "event");
-        
-      } else if (keyValue[0] == "eventOverride"
-                  && keyValue[1] in DATA && keyValue[1] != "main") {
-        // Parse ?eventOverride=X
-        
-        // This is a quick hack to allow switching to non-current events.
-        setGameLocal("CurrentMode", "event");
-        DATA.event = DATA[keyValue[1]];
-        eventScheduleInfo = {
-          LteId: keyValue[1],
-          BalanceId: keyValue[1],
-          ThemeId: keyValue[1].split('-')[0], // take the xxx part of xxx-bal-5
-          StartTimeMillis: now,
-          EndTimeMillis: now,
-          Rewards: Array(20) // empty values, which the tracker handles gracefully
-        };
-        if (THEME_ID_OVERRIDES[keyValue[1]]) {
-          eventScheduleInfo['ThemeId'] = THEME_ID_OVERRIDES[keyValue[1]];
-        }
-        $('#overrideWarning').addClass("show");
-        $('#alertReset').remove(); // don't show the Reset Alert ever in this mode.  Hacky.
-      }
     }
-  }
   
-  // Get values from URL params > previous save > defaults.
-  currentMode = getGameLocal("CurrentMode") || currentMode;
-  currentMainRank = parseInt(getLocal("main", "CurrentRank")) || currentMainRank;
+    // Get values from URL params > previous save > defaults.
+    currentMode = getGameLocal("CurrentMode") || currentMode;
+    currentMainRank = parseInt(getLocal("main", "CurrentRank")) || currentMainRank;
+    IsEvent = (currentMode != "main");
   
-  // Determine eventScheduleInfo and DATA.event based on the Schedule (if needed).
-  if (!eventScheduleInfo) {
-    eventScheduleInfo = getCurrentEventInfo(now);
-  }
+    // Determine eventScheduleInfo and DATA.event based on the Schedule (if needed).
+    if (!eventScheduleInfo) {
+        eventScheduleInfo = getCurrentEventInfo(now);
+    }
+
+    // Initialize fake (blank) events, used as stubs when datamined info is unavailable
+    if (DATA[eventScheduleInfo.BalanceId]["fake"] && IsEvent) {
+        DATA.event = {"Generators": [], "Industries": [], "Missions": [], "Researchers": [], "Resources": [{"Id":"potato"}]};
+        $('#alertFakeEvent').removeClass("collapse");
+    }
   
-  // Initialize fake (blank) events, used as stubs when datamined info is unavailable
-  if (DATA[eventScheduleInfo.BalanceId]["fake"] && currentMode == "event") {
-    DATA.event = {"Generators": [], "Industries": [], "Missions": [], "Researchers": [], "Resources": [{"Id":"potato"}]};
-    $('#alertFakeEvent').removeClass("collapse");
-  }
+    // Otherwise, point DATA.event to the current event.  This is for legacy reasons.
+    if (!("event" in DATA)) {
+        DATA.event = DATA[eventScheduleInfo.BalanceId];
+    }
   
-  // Otherwise, point DATA.event to the current event.  This is for legacy reasons.
-  if (!("event" in DATA)) {
-    DATA.event = DATA[eventScheduleInfo.BalanceId];
-  }
+    // Set up the top-left title in the navbar
+    let iconSrc = `img/shared/themeicons/${(!IsEvent) ? "main" : eventScheduleInfo.ThemeId}.png`;
+    let icon = `<img class="scheduleIcon" src="${iconSrc}">`;
+
+    let eventName = upperCaseFirstLetter(THEME_ID_TITLE_OVERRIDES[eventScheduleInfo.ThemeId] || eventScheduleInfo.ThemeId);
+    let title = (!IsEvent) ? THEME_ID_TITLE_OVERRIDES["main"] : eventName;
+
+    // The top-left dropdown always shows the current event, regardless of overrides.
+    let trueCurrentEvent = getCurrentEventInfo();
+    let trueCurrentEventTitle = THEME_ID_TITLE_OVERRIDES[trueCurrentEvent.ThemeId] || trueCurrentEvent.ThemeId;
+    trueCurrentEventTitle = upperCaseFirstLetter(trueCurrentEventTitle); 
+    let trueEventIcon = `<img class="scheduleIcon" src="img/shared/themeicons/${trueCurrentEvent.ThemeId}.png">`;
+
+    $('#mode-select-title').html(`${icon} ${title}`);
+    $('#mode-select-title').addClass("show");
+    $('#mode-select-event').html(`${trueEventIcon} ${trueCurrentEventTitle}`);
   
-  // Set up the top-left title in the navbar
-  let iconSrc = `img/shared/themeicons/${(currentMode == "main") ? "main" : eventScheduleInfo.ThemeId}.png`;
-  let icon = `<img class="scheduleIcon" src="${iconSrc}">`;
+    $(`#mode-select-main,#mode-select-event`).removeClass("active");
+    if (!IsEvent || trueCurrentEvent.EndTimeMillis == eventScheduleInfo.EndTimeMillis) {
+        $(`#mode-select-${currentMode}`).addClass("active");
+    } 
+    else if (window.location.href.search('eventOverride') !== -1) {
+        $('#mode-select-eventbal').addClass("active");
+    } 
+    else {
+        $('#mode-select-schedule').addClass("active");
+    }
   
-  let eventName = THEME_ID_TITLE_OVERRIDES[eventScheduleInfo.ThemeId] || eventScheduleInfo.ThemeId;
-  eventName = upperCaseFirstLetter(eventName);
-  let title = (currentMode == "main") ? THEME_ID_TITLE_OVERRIDES["main"] : eventName;
-  
-  // The top-left dropdown always shows the current event, regardless of overrides.
-  let trueCurrentEvent = getCurrentEventInfo();
-  let trueCurrentEventTitle = THEME_ID_TITLE_OVERRIDES[trueCurrentEvent.ThemeId] || trueCurrentEvent.ThemeId;
-  trueCurrentEventTitle = upperCaseFirstLetter(trueCurrentEventTitle); 
-  let trueEventIcon = `<img class="scheduleIcon" src="img/shared/themeicons/${trueCurrentEvent.ThemeId}.png">`;
-  
-  $('#mode-select-title').html(`${icon} ${title}`);
-  $('#mode-select-title').addClass("show");
-  $('#mode-select-event').html(`${trueEventIcon} ${trueCurrentEventTitle}`);
-  
-  $(`#mode-select-main,#mode-select-event`).removeClass("active");
-  if (currentMode == "main" || trueCurrentEvent.EndTimeMillis == eventScheduleInfo.EndTimeMillis) {
-    $(`#mode-select-${currentMode}`).addClass("active");
-  } else if (window.location.href.search('eventOverride') !== -1) {
-    $('#mode-select-eventbal').addClass("active");
-  } else {
-    $('#mode-select-schedule').addClass("active");
-  }
-  
-  // Set up the icon for the "All Generators" button in the navbar
-  let firstResourceId = getData().Resources[0].Id;
-  $('#viewBalanceInfoButton').html(`<img src="${iconSrc}">`);
-  $('#viewAllGeneratorsButton').html(`<img src="${getImageDirectory()}/${firstResourceId}.png">`);
-  
-  // Show a "datamined" warning for future ranks that aren't in the current version
-  if ((DATAMINE_WARNING_MIN_RANK && currentMode == "main" && currentMainRank >= DATAMINE_WARNING_MIN_RANK) ||
-      (DATAMINE_WARNING_THEME_ID && currentMode == "event" && eventScheduleInfo.ThemeId == DATAMINE_WARNING_THEME_ID)) {
-    $('#alertUnconfirmed').removeClass('collapse');
-  }
+    // Set up the icon for the "All Generators" button in the navbar
+    let firstResourceId = getData().Resources[0].Id;
+    $('#viewBalanceInfoButton').html(`<img src="${iconSrc}">`);
+    $('#viewAllGeneratorsButton').html(`<img src="${getImageDirectory()}/${firstResourceId}.png">`);
+
+    // Show a "datamined" warning for future ranks that aren't in the current version
+    if ((DATAMINE_WARNING_MIN_RANK && !IsEvent && currentMainRank >= DATAMINE_WARNING_MIN_RANK) ||
+        (DATAMINE_WARNING_THEME_ID && IsEvent && eventScheduleInfo.ThemeId == DATAMINE_WARNING_THEME_ID)) {
+        $('#alertUnconfirmed').removeClass('collapse');
+    }
 }
 
 function setIconCssVar(varName, assetUrl) {
-  document.documentElement.style.setProperty(varName, `url("img/${assetUrl}")`);
+    document.documentElement.style.setProperty(varName, `url("img/${assetUrl}")`);
 }
 
 function applyIconCssVariables() {
-  setIconCssVar('--icon-gacha-plastic', 'shared/gacha/plastic.png');
-  setIconCssVar('--icon-gacha-armored', 'shared/gacha/armored.png');
-  setIconCssVar('--icon-gacha-wood', 'shared/gacha/wood.png');
-  setIconCssVar('--icon-gacha-stone', 'shared/gacha/stone.png');
-  setIconCssVar('--icon-gacha-rare', 'shared/gacha/rare.png');
-  setIconCssVar('--icon-gacha-rankup', 'shared/gacha/rankup.png');
-  setIconCssVar('--icon-gacha-epic', 'shared/gacha/epic.png');
-  setIconCssVar('--icon-gacha-gold', 'shared/gacha/gold.png');
-  setIconCssVar('--icon-gacha-supreme', 'shared/gacha/supreme.png');
+    setIconCssVar('--icon-gacha-plastic', 'shared/gacha/plastic.png');
+    setIconCssVar('--icon-gacha-armored', 'shared/gacha/armored.png');
+    setIconCssVar('--icon-gacha-wood', 'shared/gacha/wood.png');
+    setIconCssVar('--icon-gacha-stone', 'shared/gacha/stone.png');
+    setIconCssVar('--icon-gacha-rare', 'shared/gacha/rare.png');
+    setIconCssVar('--icon-gacha-rankup', 'shared/gacha/rankup.png');
+    setIconCssVar('--icon-gacha-epic', 'shared/gacha/epic.png');
+    setIconCssVar('--icon-gacha-gold', 'shared/gacha/gold.png');
+    setIconCssVar('--icon-gacha-supreme', 'shared/gacha/supreme.png');
 
-  setIconCssVar('--icon-darkscience', 'event/darkscience.png');
-  setIconCssVar('--icon-science', 'main/scientist.png');
-  setIconCssVar('--icon-comrade', 'shared/comrade.png');
-  setIconCssVar('--icon-comrades-per-sec', 'shared/comrades_per_second.png');
-  setIconCssVar('--icon-boost-power', 'shared/boost_power.png');
-  setIconCssVar('--icon-discount', 'shared/discount.png');
-  setIconCssVar('--icon-crit-chance', 'shared/crit_chance.png');
-  setIconCssVar('--icon-crit-power', 'shared/crit_power.png');
-  setIconCssVar('--icon-speed', 'shared/speed.png');
-  setIconCssVar('--icon-card', 'shared/card.png');
+    setIconCssVar('--icon-darkscience', 'event/darkscience.png');
+    setIconCssVar('--icon-science', 'main/scientist.png');
+    setIconCssVar('--icon-comrade', 'shared/comrade.png');
+    setIconCssVar('--icon-comrades-per-sec', 'shared/comrades_per_second.png');
+    setIconCssVar('--icon-boost-power', 'shared/boost_power.png');
+    setIconCssVar('--icon-discount', 'shared/discount.png');
+    setIconCssVar('--icon-crit-chance', 'shared/crit_chance.png');
+    setIconCssVar('--icon-crit-power', 'shared/crit_power.png');
+    setIconCssVar('--icon-speed', 'shared/speed.png');
+    setIconCssVar('--icon-card', 'shared/card.png');
 }
 
 
@@ -232,7 +241,7 @@ function getSchedulePopupEvent(eventInfo) {
   let name = ENGLISH_MAP[`lte.${eventInfo.ThemeId}.name`];
   
   let headerClasses = "";
-  if (currentMode == "event" && eventInfo.LteId == eventScheduleInfo.LteId) {
+  if (IsEvent && eventInfo.LteId == eventScheduleInfo.LteId) {
     // This is the currently-tracked event, highlight the header.
     headerClasses = "selected";
   }
@@ -608,7 +617,7 @@ function initializeLocalization() {
 // This is different for main/event and returns slightly different objects.
 function initializeMissionData() {
   // TODO: Make this object-oriented at some point?
-  if (currentMode == "main") {
+  if (!IsEvent) {
     initializeMainMissionData();
   } else {
     initializeEventMissionData();
@@ -846,7 +855,7 @@ function loadSaveData() {
     setLocal("main", "CompletedVisible", isNewSave.toString());  // New saves start open
   }
   
-  if (currentMode == "event") {
+  if (IsEvent) {
     loadEventSaveData();
   } else {
     loadMainSaveData();
@@ -946,7 +955,7 @@ function loadMainSaveData() {
 // Makes a local save of data so you can refresh/switch page.
 // Typically called after you make changes to missionData.
 function updateSaveData() {
-  if (currentMode == "event") {
+  if (IsEvent) {
     let saveData = missionData.Completed.Remaining.map(m => m.Id).join(',');
     setLocal("event", "Completed", saveData);
   } else {
@@ -978,7 +987,7 @@ function renderMissions() {
   let missionEtas = getMissionEtas();
   
   let sortedRanks;
-  if (currentMode == "event") {
+  if (IsEvent) {
     sortedRanks = Object.keys(missionData);
     sortedRanks.splice(sortedRanks.indexOf("Completed"), 1);
     sortedRanks.splice(sortedRanks.indexOf("Current"), 1);
@@ -990,7 +999,7 @@ function renderMissions() {
   
   
   for (let rank of sortedRanks) {
-    if (missionData[rank].Remaining.length == 0 && currentMode == "event" && rank != 'Completed') {
+    if (missionData[rank].Remaining.length == 0 && IsEvent && rank != 'Completed') {
       continue;
     }
     
@@ -1008,7 +1017,7 @@ function renderMissions() {
       // Find lowest rank with a remaining mission.
       let rankTitle = "Complete!";
       
-      if (currentMode == "event") {
+      if (IsEvent) {
         rankTitle = getEventCurrentRankTitle();
       } else {
         // Motherland
@@ -1017,7 +1026,7 @@ function renderMissions() {
       }
       
       title = `Current <span class="currentRank float-right">Rank ${rankTitle}</span>`;
-    } else if (currentMode == "main") {
+    } else if (!IsEvent) {
       // A generic MAIN rank
       let buttonsHtml = "";
       
@@ -1069,7 +1078,7 @@ function renderMissions() {
       missionHtml += getHelpHtml(false);
     }
     
-    if (currentMode == "main" && rank == currentMainRank && missionData[rank].Remaining.length == 0 && missionData.Current.Remaining.length == 0) {
+    if (!IsEvent && rank == currentMainRank && missionData[rank].Remaining.length == 0 && missionData.Current.Remaining.length == 0) {
       // In the main mode, when you run out of missions, give a helpful message.
       missionHtml += `<ul><li>Congratulations on completing all missions in Rank ${rank}!</li><li>To go to the next rank, click the &rarr; button in the corner.</li></ul>`;
     } else {
@@ -1094,9 +1103,9 @@ function getHelpHtml(isPopup) {
     let firstResourceId = getData().Resources[0].Id;
     let wordForResearchers = upperCaseFirstLetter(ENGLISH_MAP[`conditionmodel.researcher.plural`]);
 
-    let isEvent = (currentMode != "main");
-    let themeId = isEvent ? (THEME_ID_OVERRIDES[eventScheduleInfo.ThemeId] || eventScheduleInfo.ThemeId) : "main"; 
-    let capsuleIcon = isEvent ? "plastic" : "wood";
+    let IsEvent = (currentMode != "main");
+    let themeId = IsEvent ? (THEME_ID_OVERRIDES[eventScheduleInfo.ThemeId] || eventScheduleInfo.ThemeId) : "main"; 
+    let capsuleIcon = IsEvent ? "plastic" : "wood";
 
     let result = `
     <ul>
@@ -1269,7 +1278,7 @@ function renderListStyleMissions() {
   let missionHtml = "<div class='mx-2'>\n";
   
   let ranksToShow = [];
-  if (currentMode == "main") {
+  if (!IsEvent) {
     ranksToShow = getData().Ranks.filter(r => r.Rank == currentMainRank);
     if (currentMainRank > 1) {
       missionHtml += `<a href="?rank=${currentMainRank - 1}" type="button" class="btn btn-outline-secondary" title="Go back to Rank ${currentMainRank - 1}">&larr;</button>`;
@@ -1522,7 +1531,7 @@ function clickMission(missionId) {
     missionData.Completed.Remaining.push(mission);
     
     // Find a new mission to replace it with
-    if (currentMode == "event") {
+    if (IsEvent) {
       for (let rank = 1; rank <= getData().Ranks.length; rank++) {
         if (missionData[rank].Remaining.length > 0) {
           let newMission = missionData[rank].Remaining.shift();
@@ -1579,6 +1588,42 @@ function clickMission(missionId) {
   }
 }
 
+// Gets the index for the associated AA notation within the POWERS dictionary.
+// If the index is not found, the function calculates the letter at the index and then adds it to the POWERS list, using ASCII values.
+let POWERS = {
+    0: 'K', 1: 'M', 2: 'B', 3: 'T'
+};
+
+function getPowerByIndex(letterIndex) {
+    if (Object.keys(POWERS).includes(letterIndex.toString())) {
+        return POWERS[letterIndex];
+    }
+    
+    let startChr = 'A'.charCodeAt(0);
+    let endChr = 'Z'.charCodeAt(0);
+    let chrIdx = (startChr + letterIndex) - 4;
+    let chrCount = 2;
+
+    while (chrIdx > endChr) {
+        chrIdx -= 26;
+        chrCount++;
+    }
+
+    POWERS[letterIndex] = String.fromCharCode(chrIdx).repeat(chrCount);
+    return getPowerByIndex(letterIndex);
+}
+
+function getNotationIndexByPower(power) {
+    power = power.toUpperCase();
+
+    if (power.length === 1) {
+        return {K: 0, M: 1, B: 2, T: 3}[power] ?? -1;
+    }
+
+    let chr = power.charCodeAt(0) - 65;
+    return 4 + chr + ((power.length - 2) * 26);
+}
+
 // Converts numbers to AdCom style. bigNum(1E21) => "1 CC", significantCharacters includes the decimal point
 function bigNum(x, minimumCutoff = 1e+6, significantCharacters = 100, localeOverride = undefined) {
   if (x < minimumCutoff) {
@@ -1591,7 +1636,7 @@ function bigNum(x, minimumCutoff = 1e+6, significantCharacters = 100, localeOver
   let mantissa = x / Math.pow(10, thousands * 3);
   let numberString = mantissa.toLocaleString(localeOverride, {maximumFractionDigits: 2}).slice(0, significantCharacters + 1);
   numberString = numberString.replace(/\xA0/g, " ");
-  return `${numberString} ${POWERS[thousands - 1]}`;
+  return `${numberString} ${getPowerByIndex(thousands - 1)}`;
 }
 
 // This is like bigNum but enforces 3 sig figs after 9999
@@ -1620,7 +1665,7 @@ function fromBigNum(x, localeOverride = undefined) {
     return parseLocaleNumber(split[0], localeOverride);
     
   } else if (split.length == 2) {    
-    let powerIndex = POWERS.indexOf(split[1].toUpperCase());
+    let powerIndex = getNotationIndexByPower(split[1].toUpperCase());
     let mantissa = parseLocaleNumber(split[0], localeOverride);
     if (powerIndex != -1 && !isNaN(mantissa)) {
       return mantissa * Math.pow(1000, powerIndex + 1);
@@ -1721,7 +1766,7 @@ function describeMission(mission, overrideIcon = "") {
       textHtml =`${upperCaseFirstLetter(ENGLISH_MAP['conditionmodel.trade.singular'])} ${resourceName(condition.ConditionId)} (${condition.Threshold})`;
       break;
     case "ResearchersUpgradedSinceSubscription": {
-      let overrideDirectory = (currentMode == "event") ? "img/event" : "";
+      let overrideDirectory = (IsEvent) ? "img/event" : "";
       iconHtml = getMissionIcon("upgrade", condition.ConditionType, overrideIcon, overrideDirectory);
       textHtml = `${ENGLISH_MAP['mission.researchersupgradedsincesubscription.any.simplename']} (${condition.Threshold})`;
       break;
@@ -1743,7 +1788,7 @@ function describeMission(mission, overrideIcon = "") {
       textHtml = `Collect Cards (${condition.Threshold})`;
       break;
     } case "ResourcesSpentSinceSubscription": {
-      let overrideDirectory = (currentMode == "event") ? "img/event" : "";  // Use /img/event/ of /img/event/theme/
+      let overrideDirectory = (IsEvent) ? "img/event" : "";  // Use /img/event/ of /img/event/theme/
       iconHtml = getMissionIcon(condition.ConditionId, condition.ConditionType, overrideIcon, overrideDirectory);
       textHtml = `Spend ${resourceName(condition.ConditionId)} (${condition.Threshold})`;
       break;
@@ -1978,7 +2023,7 @@ var MISSION_EMOJI = {
 function getImageDirectory(overrideDirectory = "") {
   if (overrideDirectory) {
     return overrideDirectory;
-  } else if (currentMode == "event" && eventScheduleInfo && eventScheduleInfo.ThemeId) {
+  } else if (IsEvent && eventScheduleInfo && eventScheduleInfo.ThemeId) {
     return `img/${currentMode}/${eventScheduleInfo.ThemeId}`;
   } else {
     return `img/${currentMode}`;
@@ -2719,7 +2764,6 @@ function getScriptedCapsulesPopup() {
 }
 
 function getScriptedsByCapsule() {
-    let isEvent = (currentMode != 'main');
     let balanceMissions = getData().Missions;
     let balanceRanks = getData().Ranks;
     let scriptedData = getData().GachaScripts;
@@ -2729,7 +2773,7 @@ function getScriptedsByCapsule() {
     let tableHtml = `
         <tr>
             <th>Mission</th>
-            <th>${isEvent ? "" : "Rank"}</th>
+            <th>${IsEvent ? "" : "Rank"}</th>
             <th>Rewards</th>
         </tr>
     `;
@@ -2756,7 +2800,7 @@ function getScriptedsByCapsule() {
         let scripted = scriptedData.find(x => x.GachaId == scriptedId);
         
         let missionName = describeMission(mission);
-        let rankNumber = isEvent ? "" : mission.Rank;
+        let rankNumber = IsEvent ? "" : mission.Rank;
 
         tableHtml += `
             <tr>
@@ -2787,9 +2831,8 @@ function getScriptedsByCapsule() {
 }
 
 function getScriptedCapsuleBreakdown(script) {
-    let isEvent = (currentMode != 'main');
-    let scienceId = (isEvent) ? 'darkscience' : 'science';
-    let scienceName = (isEvent) ? resourceName('darkscience') : resourceName('scientist');
+    let scienceId = (IsEvent) ? 'darkscience' : 'science';
+    let scienceName = (IsEvent) ? resourceName('darkscience') : resourceName('scientist');
 
     let rewardsList = ``;
 
@@ -4314,7 +4357,7 @@ function saveMissionEtas(missionEtas) {
 }
 
 function getMissionEtasKey() {
-  if (currentMode == "main") {
+  if (!IsEvent) {
     return `MissionEtas-${currentMainRank}`; // saved by rank for some efficiency
   } else {
     return "MissionEtas";
