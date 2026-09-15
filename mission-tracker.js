@@ -217,6 +217,21 @@ function applyIconCssVariables() {
     setIconCssVar('--icon-card', 'shared/card.png');
 }
 
+function collapseableCard(cardId, cardHeaderHtml, cardBodyHtml, selected = false) {
+    return `
+    <div class="card">
+        <div class="card-header scheduleHeader ${selected ? "selected" : ""}" data-toggle="collapse" data-target="#${cardId}" aria-controls="${cardId}">
+            ${cardHeaderHtml}
+        </div>
+        <div class="collapse" id="${cardId}">
+            <div class="card-body">
+                ${cardBodyHtml}
+            </div>
+        </div>
+    </div>
+    `;
+}
+
 
 // Returns the HTML for the body of the schedule popup
 function getSchedulePopup() {
@@ -240,87 +255,68 @@ function getSchedulePopupEvent(eventInfo) {
   let lteId = eventInfo.LteId;
   let name = ENGLISH_MAP[`lte.${eventInfo.ThemeId}.name`];
   
-  let headerClasses = "";
+  let isCurrent = false;
   if (IsEvent && eventInfo.LteId == eventScheduleInfo.LteId) {
     // This is the currently-tracked event, highlight the header.
-    headerClasses = "selected";
+    isCurrent = true;
   }
   
   let top3RewardIcons = eventInfo.Rewards.slice(-3).map(r => getRewardIcon(r)).join('');
   let completionRewards = eventInfo.Rewards.map(r => `<li><span class="rewardListIconWrapper">${getRewardIcon(r)}</span> ${describeScheduleRankReward(r)}</li>`).join('');
   
-  return `
-    <div class="card">
-      <div class="card-header scheduleHeader ${headerClasses}" data-toggle="collapse" data-target="#scheduleBody-${lteId}" aria-controls="scheduleBody-${lteId}">
+  let scheduleId = `scheduleBody-${lteId}`;
+  let scheduleHeader = `
         <img src='img/shared/themeicons/${eventInfo.ThemeId}.png' class="scheduleIconLarge">
         ${startShort} - ${endShort}
         <span class="float-right">${top3RewardIcons} <span class="ml-2">(+)</span></span>
-      </div>
-      <div class="collapse" id="scheduleBody-${lteId}">
-        <div class="card-body">
-          <div><strong>${name}</strong><span class="float-right"><a href="?event=${eventInfo.EndTimeMillis}">View in Tracker</a></span></div><br />
-          <strong>Starts:</strong> ${startLong}<br />
-          <strong>Ends:</strong> ${endLong}<br /><br />
-          <strong>Rank Completion Rewards:</strong><br />
-          <ol>${completionRewards}</ol>
-        </div>
-      </div>
-    </div>`;
+  `;
+  let scheduleBody = `
+        <div><strong>${name}</strong><span class="float-right"><a href="?event=${eventInfo.EndTimeMillis}">View in Tracker</a></span></div><br />
+        <strong>Starts:</strong> ${startLong}<br />
+        <strong>Ends:</strong> ${endLong}<br /><br />
+        <strong>Rank Completion Rewards:</strong><br />
+        <ol>${completionRewards}</ol>
+  `;
+
+  return collapseableCard(scheduleId, scheduleHeader, scheduleBody, selected = isCurrent);
 }
 
 // get HTML for all balances
 function getAllEventBalanceHtml() {
-  let data = `
-  <div class="card">
-    <div class="card-header scheduleHeader" data-toggle="collapse" data-target="#scheduleBody-main" aria-controls="scheduleBody-main">
-      <img src='img/shared/themeicons/main.png' class="scheduleIconLarge">
-      ${THEME_ID_TITLE_OVERRIDES["main"]}
-      <span class="float-right"><span class="ml-2">(+)</span></span>
-    </div>
-    <div class="collapse" id="scheduleBody-main">
-      <div class="card-body">
-        <div><span class="float-right"><a href="?mode=main">View in Tracker</a></span></div>
-        <div><strong>Last Update: </strong>${BALANCE_UPDATE_VERSION['main']}</div>
-      </div>
-    </div>
-  </div>
-`;
+    let data = ``;
 
-  for (i of Object.keys(DATA)) {
-    const lteId = i;
+    // Put Motherland at the start of the list
+    let balancesList = Object.keys(DATA);
+    balancesList.splice(balancesList.indexOf("evergreen"), 1);
+    balancesList.unshift("evergreen");
 
-    if (i === "event" || i === "main" || i === "evergreen") {
-      continue;
-    }
+    balancesList.forEach(balId => {
+        let name;
+        let siteArgument;
+        let themeId = balId.split('-')[0];
 
-    let themeId = lteId.split('-')[0];
-    
-    if (THEME_ID_OVERRIDES[lteId]) {
-      themeId = THEME_ID_OVERRIDES[lteId];
-    }
+        if (themeId == "evergreen") {
+            themeId = "main";
+            name = THEME_ID_TITLE_OVERRIDES["main"];
+            siteArgument = `?mode=main`;
+        }
+        else {
+            name = ENGLISH_MAP[`lte.${themeId}.name`] ?? themeId;
+            siteArgument = `?mode=event&eventOverride=${balId}`;
+        }
 
-    let balanceLastUpdate = BALANCE_UPDATE_VERSION[lteId] ? BALANCE_UPDATE_VERSION[lteId] : "unknown";
+        if (THEME_ID_OVERRIDES[balId]) {
+            themeId = THEME_ID_OVERRIDES[balId];
+        }
 
-    const name = ENGLISH_MAP[`lte.${themeId}.name`];
+        let balanceLastUpdate = BALANCE_UPDATE_VERSION[balId] ?? "unknown";
 
-    data += `
-      <div class="card">
-        <div class="card-header scheduleHeader" data-toggle="collapse" data-target="#scheduleBody-${themeId}" aria-controls="scheduleBody-${themeId}">
-          <img src='img/shared/themeicons/${themeId}.png' class="scheduleIconLarge">
-          ${name}
-          <span class="float-right"><span class="ml-2">(+)</span></span>
-        </div>
-        <div class="collapse" id="scheduleBody-${themeId}">
-          <div class="card-body">
-            <div><span class="float-right"><a href="?mode=event&eventOverride=${lteId}">View in Tracker</a></span></div>
-            <div><strong>Last Update: </strong>${balanceLastUpdate}</div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
+        let headerContent = `<img src='img/shared/themeicons/${themeId}.png' class="scheduleIconLarge"> ${name} <span class="float-right"><span class="ml-2">(+)</span></span>`;
+        let bodyContent = `<div><span class="float-right"><a href="${siteArgument}">View in Tracker</a></span></div><div><strong>Last Update: </strong>${balanceLastUpdate}</div>`;
+        data += collapseableCard(`scheduleBody-${themeId}`, headerContent, bodyContent);
+    });
 
-  return data;
+    return data;
 }
 
 // Returns the current event info based on the time and the schedule's cycles
@@ -1866,10 +1862,10 @@ function getResearcherFullDetailsHtml(researcher) {
 function getResearcherBasicDetails(researcher) {
   let resources;
   let vals = [
-               getValueForResearcherLevel(researcher, 1),
-               getValueForResearcherLevel(researcher, 2),
-               getValueForResearcherLevel(researcher, 3)
-             ];
+    getValueForResearcherLevel(researcher, 1),
+    getValueForResearcherLevel(researcher, 2),
+    getValueForResearcherLevel(researcher, 3)
+  ];
              
   switch (researcher.ModType) {
     case "GenManagerAndSpeedMult":
@@ -3044,11 +3040,7 @@ function getCapsuleDistribution(capsule, rank, rarity) {
 
 // quick helper function to convert float to percentage
 function percentageConversion(f) {
-  let fp = parseFloat(f);
-  fp *= 100;
-  fp = fp.toFixed(0);
-  let fs = fp.toString() + "%";
-  return fs
+    return `${(parseFloat(f) * 100).toFixed(0)}%`
 }
 
 // Returns html for the calculator's sub-tab where you input generator and resource counts.
@@ -3550,7 +3542,7 @@ function getValueForResearcherLevel(researcher, level) {
 
 // Returns  the multiplier (1x) or chance (0-1) given a researcher and formValues containing its level.
 function getValueForResearcherWithForm(researcher, formValues) {
-  return getValueForResearcherLevel(researcher, formValues.ResearcherLevels[researcher.Id]);
+    return getValueForResearcherLevel(researcher, formValues.ResearcherLevels[researcher.Id]);
 }
 
 // Called when the level down/up buttons are clicked
@@ -3592,12 +3584,12 @@ function clickLevelResearcher(researcherId, newLevelValue) {
 }
 
 function clickChangePropagandaBoost(newLevelValue) {
-  let formValues = getFormValuesObject();
-  formValues.ResearcherLevels['PropagandaBoost'] = newLevelValue;
-  saveFormValues(formValues);
-  
-  $(`.modal.show #propBoostCol`).html(getPropagandaBoostCard(formValues));
-  updateGeneratorsTab();
+    let formValues = getFormValuesObject();
+    formValues.ResearcherLevels['PropagandaBoost'] = newLevelValue;
+    saveFormValues(formValues);
+
+    $(`.modal.show #propBoostCol`).html(getPropagandaBoostCard(formValues));
+    updateGeneratorsTab();
 }
 
 // Returns the url of an icon representing the target of the researcher

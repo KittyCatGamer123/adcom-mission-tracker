@@ -30,6 +30,7 @@ var BALANCE_UPDATE_VERSION = {
   "cowboy-bal-2": "6.14",
   "crusade-bal-1": "6.14",
   "defense-bal-21": "6.14",
+  "evergreen": "6.42",
   "export-bal-21": "6.29",
   "fusfarm-bal-30": "6.30",
   "fuspet-bal-32": "6.30",
@@ -46,8 +47,7 @@ var BALANCE_UPDATE_VERSION = {
   "stone-bal-4": "6.29",
   "supervillain-bal-17": "6.41",
   "winter-bal-3": "6.14",
-  "zombie-bal-5": "6.14",
-  "main": "6.42"
+  "zombie-bal-5": "6.14"
 };
 
 // For game-specific documentation and social channels
