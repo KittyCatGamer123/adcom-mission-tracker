@@ -232,53 +232,52 @@ function collapseableCard(cardId, cardHeaderHtml, cardBodyHtml, selected = false
     `;
 }
 
-
 // Returns the HTML for the body of the schedule popup
 function getSchedulePopup() {
-  let soonestEvents = getSoonestEventInfos();
-  return soonestEvents.map(x => getSchedulePopupEvent(x)).join("<br />");
+    let soonestEvents = getSoonestEventInfos();
+    return soonestEvents.map(x => getSchedulePopupEvent(x)).join("<br />");
 }
 
 // Returns the HTML for the schedule event block for a given event
 function getSchedulePopupEvent(eventInfo) {
-  let shortOptions = { weekday: 'short', month: 'short', day: 'numeric' };
-  let longOptions = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', timeZoneName: 'short' };
-  
-  let start = new Date(eventInfo.StartTimeMillis);
-  let startShort = start.toLocaleDateString(undefined, shortOptions);
-  let startLong = start.toLocaleDateString(undefined, longOptions);
-  
-  let end = new Date(eventInfo.EndTimeMillis);
-  let endShort = end.toLocaleDateString(undefined, shortOptions)
-  let endLong = end.toLocaleDateString(undefined, longOptions);
-  
-  let lteId = eventInfo.LteId;
-  let name = ENGLISH_MAP[`lte.${eventInfo.ThemeId}.name`];
-  
-  let isCurrent = false;
-  if (IsEvent && eventInfo.LteId == eventScheduleInfo.LteId) {
-    // This is the currently-tracked event, highlight the header.
-    isCurrent = true;
-  }
-  
-  let top3RewardIcons = eventInfo.Rewards.slice(-3).map(r => getRewardIcon(r)).join('');
-  let completionRewards = eventInfo.Rewards.map(r => `<li><span class="rewardListIconWrapper">${getRewardIcon(r)}</span> ${describeScheduleRankReward(r)}</li>`).join('');
-  
-  let scheduleId = `scheduleBody-${lteId}`;
-  let scheduleHeader = `
+    let shortOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+    let longOptions = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', timeZoneName: 'short' };
+
+    let start = new Date(eventInfo.StartTimeMillis);
+    let startShort = start.toLocaleDateString(undefined, shortOptions);
+    let startLong = start.toLocaleDateString(undefined, longOptions);
+
+    let end = new Date(eventInfo.EndTimeMillis);
+    let endShort = end.toLocaleDateString(undefined, shortOptions)
+    let endLong = end.toLocaleDateString(undefined, longOptions);
+
+    let lteId = eventInfo.LteId;
+    let name = ENGLISH_MAP[`lte.${eventInfo.ThemeId}.name`];
+
+    let isCurrent = false;
+    if (IsEvent && eventInfo.LteId == eventScheduleInfo.LteId) {
+        // This is the currently-tracked event, highlight the header.
+        isCurrent = true;
+    }
+
+    let top3RewardIcons = eventInfo.Rewards.slice(-3).map(r => getRewardIcon(r)).join('');
+    let completionRewards = eventInfo.Rewards.map(r => `<li><span class="rewardListIconWrapper">${getRewardIcon(r)}</span> ${describeScheduleRankReward(r)}</li>`).join('');
+
+    let scheduleId = `scheduleBody-${lteId}`;
+    let scheduleHeader = `
         <img src='img/shared/themeicons/${eventInfo.ThemeId}.png' class="scheduleIconLarge">
         ${startShort} - ${endShort}
         <span class="float-right">${top3RewardIcons} <span class="ml-2">(+)</span></span>
-  `;
-  let scheduleBody = `
+    `;
+    let scheduleBody = `
         <div><strong>${name}</strong><span class="float-right"><a href="?event=${eventInfo.EndTimeMillis}">View in Tracker</a></span></div><br />
         <strong>Starts:</strong> ${startLong}<br />
         <strong>Ends:</strong> ${endLong}<br /><br />
         <strong>Rank Completion Rewards:</strong><br />
         <ol>${completionRewards}</ol>
-  `;
+    `;
 
-  return collapseableCard(scheduleId, scheduleHeader, scheduleBody, selected = isCurrent);
+    return collapseableCard(scheduleId, scheduleHeader, scheduleBody, selected = isCurrent);
 }
 
 // get HTML for all balances
@@ -299,6 +298,9 @@ function getAllEventBalanceHtml() {
             themeId = "main";
             name = THEME_ID_TITLE_OVERRIDES["main"];
             siteArgument = `?mode=main`;
+        }
+        else if (themeId == "event") {
+            return;
         }
         else {
             name = ENGLISH_MAP[`lte.${themeId}.name`] ?? themeId;
@@ -738,13 +740,13 @@ function initializePopups() {
     });
   });
 
-  applyBodyToPopup('allInfoPopup', getAllIndustryPopup, togglePopover=true, usesTabs=true);
-  applyBodyToPopup('scriptedGachaTablePopup', getScriptedCapsulesPopup, togglePopover=true, usesTabs=true);
+  applyBodyToPopup('eventBalancePopup', getAllEventBalanceHtml, togglePopover=true);
   applyBodyToPopup('balanceInfoPopup', getBalanceInfoPopup, togglePopover=true);
+  applyBodyToPopup('schedulePopup', getSchedulePopup, togglePopover=true);
+  applyBodyToPopup('allInfoPopup', getAllIndustryPopup, togglePopover=true, usesTabs=true);
   applyBodyToPopup('airdropTablePopup', getAirdropTablePopup);
   applyBodyToPopup('capsuleTablePopup', getCapsuleTablePopup);
-  applyBodyToPopup('schedulePopup', getSchedulePopup, togglePopover=true);
-  applyBodyToPopup('eventBalancePopup', getAllEventBalanceHtml, togglePopover=true);
+  applyBodyToPopup('scriptedGachaTablePopup', getScriptedCapsulesPopup, togglePopover=true, usesTabs=true);
   
   $('#rankPopupBody').html(getRankAdvanceHtml());
   $('#dataPopupBody').html(getDataManagementHtml());
