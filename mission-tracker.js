@@ -1,9 +1,12 @@
-var missionData = {}; //  The main data structure used to store the current state of missions.
-var missionCompletionTimes = {}; // Maps missionId's to when you completed them.  Can be viewed in the info popup of completed missions.
-var currentMode = "main"; 
-var currentMainRank = 1;
-var eventScheduleInfo = null;  // The main schedule metadata associated with the current LteEvent
-var ENGLISH_MAP = {}; // This gets filled in during mission.js's main(). After that, ENGLISH_MAP["active"] == "Active"
+let IsAges = false; // Have this at false for now, we'll deal with Ages later
+let ENGLISH_MAP = {}; // This gets filled in during mission.js's main(). After that, ENGLISH_MAP["active"] == "Active"
+
+let currentMode = "main"; 
+let currentMainRank = 1;
+let eventScheduleInfo = null;  // The main schedule metadata associated with the current LteEvent
+
+let missionData = {}; //  The main data structure used to store the current state of missions.
+let missionCompletionTimes = {}; // Maps missionId's to when you completed them.  Can be viewed in the info popup of completed missions.
 
 function main() {
   loadModeSettings();
@@ -12,6 +15,7 @@ function main() {
   initializeMissionData();
   initializePopups();
   initializeInputHandlers();
+  applyIconCssVariables();
   loadSaveData();
   initializeIntervalFunctions();
   renderMissions();
@@ -39,10 +43,13 @@ function loadModeSettings() {
   
   let splitUrl = window.location.href.split('#');
   splitUrl = splitUrl[0].split('?');
+  
   if (splitUrl.length == 2) {
-    let arguments = splitUrl[1].split('&');
-    for (let arg of arguments) {
+    let args = splitUrl[1].split('&');
+
+    for (let arg of args) {
       let keyValue = arg.split('=');
+
       if (keyValue.length != 2) {
         continue;
       }
@@ -136,8 +143,9 @@ function loadModeSettings() {
   }
   
   // Set up the top-left title in the navbar
-  let icon = `<img class="scheduleIcon" src="${getImageDirectory()}/schedule.png">`;
-  let eventIcon = `<img class="scheduleIcon" src="img/event/${eventScheduleInfo.ThemeId}/schedule.png">`;
+  let iconSrc = `img/shared/themeicons/${(currentMode == "main") ? "main" : eventScheduleInfo.ThemeId}.png`;
+  let icon = `<img class="scheduleIcon" src="${iconSrc}">`;
+  
   let eventName = THEME_ID_TITLE_OVERRIDES[eventScheduleInfo.ThemeId] || eventScheduleInfo.ThemeId;
   eventName = upperCaseFirstLetter(eventName);
   let title = (currentMode == "main") ? THEME_ID_TITLE_OVERRIDES["main"] : eventName;
@@ -145,8 +153,8 @@ function loadModeSettings() {
   // The top-left dropdown always shows the current event, regardless of overrides.
   let trueCurrentEvent = getCurrentEventInfo();
   let trueCurrentEventTitle = THEME_ID_TITLE_OVERRIDES[trueCurrentEvent.ThemeId] || trueCurrentEvent.ThemeId;
-  trueCurrentEventTitle = upperCaseFirstLetter(trueCurrentEventTitle);
-  let trueEventIcon = `<img class="scheduleIcon" src="img/event/${trueCurrentEvent.ThemeId}/schedule.png">`;
+  trueCurrentEventTitle = upperCaseFirstLetter(trueCurrentEventTitle); 
+  let trueEventIcon = `<img class="scheduleIcon" src="img/shared/themeicons/${trueCurrentEvent.ThemeId}.png">`;
   
   $('#mode-select-title').html(`${icon} ${title}`);
   $('#mode-select-title').addClass("show");
@@ -163,14 +171,41 @@ function loadModeSettings() {
   
   // Set up the icon for the "All Generators" button in the navbar
   let firstResourceId = getData().Resources[0].Id;
-  $('#viewAllGeneratorsButton').attr('style', `background-image:url('${getImageDirectory()}/${firstResourceId}.png')`);
-  $('#viewBalanceInfoButton').attr('style', `background-image:url('${getImageDirectory()}/schedule.png')`);
+  $('#viewBalanceInfoButton').html(`<img src="${iconSrc}">`);
+  $('#viewAllGeneratorsButton').html(`<img src="${getImageDirectory()}/${firstResourceId}.png">`);
   
   // Show a "datamined" warning for future ranks that aren't in the current version
   if ((DATAMINE_WARNING_MIN_RANK && currentMode == "main" && currentMainRank >= DATAMINE_WARNING_MIN_RANK) ||
       (DATAMINE_WARNING_THEME_ID && currentMode == "event" && eventScheduleInfo.ThemeId == DATAMINE_WARNING_THEME_ID)) {
     $('#alertUnconfirmed').removeClass('collapse');
   }
+}
+
+function setIconCssVar(varName, assetUrl) {
+  document.documentElement.style.setProperty(varName, `url("img/${assetUrl}")`);
+}
+
+function applyIconCssVariables() {
+  setIconCssVar('--icon-gacha-plastic', 'shared/gacha/plastic.png');
+  setIconCssVar('--icon-gacha-armored', 'shared/gacha/armored.png');
+  setIconCssVar('--icon-gacha-wood', 'shared/gacha/wood.png');
+  setIconCssVar('--icon-gacha-stone', 'shared/gacha/stone.png');
+  setIconCssVar('--icon-gacha-rare', 'shared/gacha/rare.png');
+  setIconCssVar('--icon-gacha-rankup', 'shared/gacha/rankup.png');
+  setIconCssVar('--icon-gacha-epic', 'shared/gacha/epic.png');
+  setIconCssVar('--icon-gacha-gold', 'shared/gacha/gold.png');
+  setIconCssVar('--icon-gacha-supreme', 'shared/gacha/supreme.png');
+
+  setIconCssVar('--icon-darkscience', 'event/darkscience.png');
+  setIconCssVar('--icon-science', 'main/scientist.png');
+  setIconCssVar('--icon-comrade', 'shared/comrade.png');
+  setIconCssVar('--icon-comrades-per-sec', 'shared/comrades_per_second.png');
+  setIconCssVar('--icon-boost-power', 'shared/boost_power.png');
+  setIconCssVar('--icon-discount', 'shared/discount.png');
+  setIconCssVar('--icon-crit-chance', 'shared/crit_chance.png');
+  setIconCssVar('--icon-crit-power', 'shared/crit_power.png');
+  setIconCssVar('--icon-speed', 'shared/speed.png');
+  setIconCssVar('--icon-card', 'shared/card.png');
 }
 
 
@@ -208,7 +243,7 @@ function getSchedulePopupEvent(eventInfo) {
   return `
     <div class="card">
       <div class="card-header scheduleHeader ${headerClasses}" data-toggle="collapse" data-target="#scheduleBody-${lteId}" aria-controls="scheduleBody-${lteId}">
-        <img src='img/event/${eventInfo.ThemeId}/schedule.png' class="scheduleIconLarge">
+        <img src='img/shared/themeicons/${eventInfo.ThemeId}.png' class="scheduleIconLarge">
         ${startShort} - ${endShort}
         <span class="float-right">${top3RewardIcons} <span class="ml-2">(+)</span></span>
       </div>
@@ -229,7 +264,7 @@ function getAllEventBalanceHtml() {
   let data = `
   <div class="card">
     <div class="card-header scheduleHeader" data-toggle="collapse" data-target="#scheduleBody-main" aria-controls="scheduleBody-main">
-      <img src='img/main/schedule.png' class="scheduleIconLarge">
+      <img src='img/shared/themeicons/main.png' class="scheduleIconLarge">
       ${THEME_ID_TITLE_OVERRIDES["main"]}
       <span class="float-right"><span class="ml-2">(+)</span></span>
     </div>
@@ -262,7 +297,7 @@ function getAllEventBalanceHtml() {
     data += `
       <div class="card">
         <div class="card-header scheduleHeader" data-toggle="collapse" data-target="#scheduleBody-${themeId}" aria-controls="scheduleBody-${themeId}">
-          <img src='img/event/${themeId}/schedule.png' class="scheduleIconLarge">
+          <img src='img/shared/themeicons/${themeId}.png' class="scheduleIconLarge">
           ${name}
           <span class="float-right"><span class="ml-2">(+)</span></span>
         </div>
@@ -700,6 +735,26 @@ function initializePopups() {
     let modal = $(this);
     modal.find('#balanceInfoPopupBody').html(getBalanceInfoPopup());
   });
+
+  $('#scriptedGachaTablePopup').on('show.bs.modal', function (event) {
+    let button = $(event.relatedTarget); // Button that triggered the modal
+    let activeTabId = button.data('tab'); // Extract info from data-* attributes
+    
+    // Fill in the body
+    let modal = $(this);
+    modal.find('#scriptedGachaTableBody').html(getScriptedCapsulesPopup());
+    
+    // Set the correct tab to be active based on which button launched the popup.
+    let activeTab = modal.find(`#${activeTabId}`);
+    activeTab.addClass('active');
+    activeTab.attr('aria-selected', 'true');
+    
+    modal.find(`[aria-labelledby="${activeTabId}"]`).addClass('show active');
+    
+    $(function () {
+      $('[data-toggle="popover"]').popover();
+    });
+  });
   
   $('#airdropTablePopup').on('show.bs.modal', function () {
     // Fill in the body
@@ -1036,24 +1091,38 @@ function renderMissions() {
 
 // This text appears in the help popup and before a user interacts with the Tracker (i.e., when Completed is empty and uncollpased)
 function getHelpHtml(isPopup) {
-  let firstResourceId = getData().Resources[0].Id;
-  let wordForResearchers = upperCaseFirstLetter(ENGLISH_MAP[`conditionmodel.researcher.plural`]);
-  let result = "";
-  
-  result += `<ul><li class="my-1">Click <strong>Current</strong> missions to move them to Completed.</li>`;
-  result += `<li class="my-1">Click <strong>Completed</strong> missions to move them back to Current.</li>`;
-  result += `<li class="my-1">Click ${isPopup? "the Completed tab's" : "this tab's"} toggle at the top-right &UpperRightArrow; to <strong>hide Completed</strong> missions.</li>`;
-  result += `<li class="my-1">Click the capsule <span class="resourceIcon wood">&nbsp;</span> next to a mission to access its <strong>Calculator</strong>.</li>`;
-  result += `<li class="my-1">If the capsule <span class="scriptedRewardInfo resourceIcon wood">&nbsp;</span> is circled, you can also view the <strong>pre-scripted rewards</strong>.</li>`;
-  result += `<li class="my-1">The header contains four sub-menus with different features:<ol>`
-  result += `<li class="my-1">Click <span class="resourceIcon" style="background-image:url('${getImageDirectory()}/schedule.png')">&nbsp;</span> to view infomation about the <strong>current balance</strong>.</li>`
-  result += `<li class="my-1">Click <span class="resourceIcon" style="background-image:url('${getImageDirectory()}/${firstResourceId}.png')">&nbsp;</span> to view all <strong>Resources/Generators</strong>.</li>`
-  result += `<li class="my-1">Click <span class="resourceIcon cardIcon">&nbsp;</span> to view all <strong>${wordForResearchers}</strong>.</li>`;
-  result += `<li class="my-1">Click <span class="resourceIcon comradesPerSec">&nbsp;</span> to view all <strong>${resourceName('comrade', false).toLowerCase()} trades</strong>.</li></ol>`;
-  result += `<li class="my-1">Got <strong>questions?</strong>  Check out the <a href="${SOCIAL_HELP_URLS['faq']}">Game Guide/FAQ</a>, <a href="${SOCIAL_HELP_URLS['discord']}">Official Discord</a>, <a href="${SOCIAL_HELP_URLS['discord_old']}">Unofficial Discord</a>, or <a href="${SOCIAL_HELP_URLS['reddit']}">Reddit</a>.</li></ul>`;
-  result += `New <a href="https://darrenskidmore.com/adcom-leaderboard/">leaderboard tracker available here</a>! You can see your exact rank in events past and present and keep tabs on your division leaderboards.`
+    let firstResourceId = getData().Resources[0].Id;
+    let wordForResearchers = upperCaseFirstLetter(ENGLISH_MAP[`conditionmodel.researcher.plural`]);
 
-  return result;
+    let isEvent = (currentMode != "main");
+    let themeId = isEvent ? (THEME_ID_OVERRIDES[eventScheduleInfo.ThemeId] || eventScheduleInfo.ThemeId) : "main"; 
+    let capsuleIcon = isEvent ? "plastic" : "wood";
+
+    let result = `
+    <ul>
+        <li class="my-1">Click <strong>Current</strong> missions to move them to Completed.</li>
+        <li class="my-1">Click <strong>Completed</strong> missions to move them back to Current.</li>
+        <li class="my-1">Click ${isPopup ? "the Completed tab's" : "this tab's"} toggle at the top-right &UpperRightArrow; to <strong>hide Completed</strong> missions.</li>
+        <li class="my-1">Click the capsule <span class="resourceIcon ${capsuleIcon}">&nbsp;</span> next to a mission to access its <strong>Calculator</strong>.</li>
+        <li class="my-1">If the capsule <span class="scriptedRewardInfo resourceIcon ${capsuleIcon}">&nbsp;</span> is circled, you can also view the <strong>pre-scripted rewards</strong>.</li>
+        <li class="my-1">The header contains four sub-menus with different features:
+        <ol>
+            <li class="my-1">Click <span class="resourceIcon" style="background-image:url('${`img/shared/themeicons/${themeId}.png`}')">&nbsp;</span> to view infomation about the <strong>current balance</strong>.</li>
+            <li class="my-1">Click <span class="resourceIcon" style="background-image:url('${getImageDirectory()}/${firstResourceId}.png')">&nbsp;</span> to view all <strong>Resources/Generators</strong>.</li>
+            <li class="my-1">Click <span class="resourceIcon cardIcon">&nbsp;</span> to view all <strong>${wordForResearchers}</strong>.</li>
+            <li class="my-1">Click <span class="resourceIcon comradesPerSec">&nbsp;</span> to view all <strong>${resourceName('comrade', false).toLowerCase()} trades</strong>.</li>
+            <li class="my-1">Click <strong>≡</strong> to view additional <strong>options and tables.</strong></li>
+        </ol>
+        <li class="my-1">Got <strong>questions?</strong>  Check out the <a href="${SOCIAL_HELP_URLS['faq']}">Game Guide/FAQ</a>, <a href="${SOCIAL_HELP_URLS['discord']}">Official Discord</a>, <a href="${SOCIAL_HELP_URLS['discord_old']}">Unofficial Discord</a>, or <a href="${SOCIAL_HELP_URLS['reddit']}">Reddit</a>.</li>
+    </ul>
+    `;
+    
+    result += `If you want to do more advanced offline calculations, <a href="https://stiwen87.github.io">check this page out.</a> (Credit to Stiwen)<br>`
+    if (!IsAges) {
+        result += `<a href="https://idlegametools.com/adcom-leaderboard/">Leaderboard tracker available here</a>! You can see your exact rank in events past and present and keep tabs on your division leaderboards.`;
+    }
+
+    return result;
 }
 
 function getKeyboardMacroHtml() {
@@ -1134,10 +1203,10 @@ function getRankAdvanceHtml() {
 
   if (currentMode === 'main') {
     currentText = 'Please enter the rank to navigate to.';
-    iconUrl = `${getImageDirectory()}/schedule.png`;
+    iconUrl = `img/shared/themeicons/main.png`;
   } else {
     currentText = 'Please enter the rank to navigate to.<br>All previous missions will be marked as complete.';
-    iconUrl = `img/event/${eventScheduleInfo.ThemeId}/schedule.png`;
+    iconUrl = `img/shared/themeicons/${eventScheduleInfo.ThemeId}.png`;
   }
 
   return `<div id="rank-${currentMode}-holder">
@@ -1972,24 +2041,23 @@ function toggleIconsStyle() {
 
 // Run OnClick for the list style option.
 function toggleListStyle() {
-    let currentListStyle = getGlobal('ListStyleActiveConfig');
-    setListStyle(!(currentListStyle == "true"));
+  let currentListStyle = getGlobal('ListStyleActiveConfig');
+  setListStyle(!(currentListStyle == "true"));
 }
 
 // Run whenever the list style option changes (OnClick) or is initialized.
 function setListStyle(isListActive, shouldRenderMissions = true) {
-    setGlobal('ListStyleActiveConfig', isListActive);
-
-    if (isListActive) {
-        $('#config-style-list').addClass('active');
-    } 
-    else {
-        $('#config-style-list').removeClass('active');
-    }
-
-    if (shouldRenderMissions) {
-        renderMissions();
-    }
+  setGlobal('ListStyleActiveConfig', isListActive);
+  
+  if (isListActive) {
+    $('#config-style-list').addClass('active');
+  } else {
+    $('#config-style-list').removeClass('active');
+  }
+  
+  if (shouldRenderMissions) {
+    renderMissions();
+  }
 }
 
 // Run OnClick for the list style option.
@@ -2629,6 +2697,186 @@ function getAllIndustryPopup() {
     </div>`;
 }
 
+function getScriptedCapsulesPopup() {
+    let firstCapsuleIconUrl = `img/shared/gacha/${getData().GachaLootTable[0].Id}.png`;
+
+    return `
+        <div class="keyboardShortcutHolder">
+            <ul class="nav nav-tabs" id="scripted-capsules-tabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="scripts-sortbyscripts-tab" data-toggle="tab" href="#scripts-sortbyscripts" role="tab" aria-controls="scripts-sortbyscripts" aria-selected="true"><div class="resourceIcon" style="background-image: url('${firstCapsuleIconUrl}');">&nbsp;</div> Capsules</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="scripts-sortbyresearcher-tab" data-toggle="tab" href="#scripts-sortbyresearcher" role="tab" aria-controls="scripts-sortbyresearcher" aria-selected="false"><div class="resourceIcon cardIcon">&nbsp;</div> Researchers</a>
+                </li>
+            </ul>
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="scripts-sortbyscripts" role="tabpanel" aria-labelledby="scripts-sortbyscripts-tab"><table class="table">${getScriptedsByCapsule()}</table></div>
+                <div class="tab-pane fade" id="scripts-sortbyresearcher" role="tabpanel" aria-labelledby="scripts-sortbyresearcher-tab"><table class="table">${getScriptedsByResearcher()}</table></div>
+            </div>
+        </div>
+    `;
+}
+
+function getScriptedsByCapsule() {
+    let isEvent = (currentMode != 'main');
+    let balanceMissions = getData().Missions;
+    let balanceRanks = getData().Ranks;
+    let scriptedData = getData().GachaScripts;
+
+    let scriptIds = scriptedData.map(x => x.GachaId);
+
+    let tableHtml = `
+        <tr>
+            <th>Mission</th>
+            <th>${isEvent ? "" : "Rank"}</th>
+            <th>Rewards</th>
+        </tr>
+    `;
+
+    // TODO: Implement a "Rank#" section for Events (harder because all missions are considered Rank 1)
+
+    // Free Capsule
+    let freeCapsuleScriptId = getData().GachaFreeCycle[0].ScriptId;
+    let freeCapsuleScript = scriptedData.find(x => x.GachaId == freeCapsuleScriptId);
+
+    tableHtml += `
+        <tr>
+            <td style='padding:5px 0'><span class="capsule ${freeCapsuleScript.MimicGachaId}">&nbsp;</span> First Free Capsule</td>
+            <td style='padding:5px 0'></td>
+            <td style='padding:5px 0'>${getScriptedCapsuleBreakdown(freeCapsuleScript)}</td>
+        </tr>
+    `;
+
+    // Missions
+    let missionsWithScripts = balanceMissions.filter(x => scriptIds.includes(x['Reward']['RewardId']));
+
+    missionsWithScripts.forEach(mission => {
+        let scriptedId = mission.Reward.RewardId;
+        let scripted = scriptedData.find(x => x.GachaId == scriptedId);
+        
+        let missionName = describeMission(mission);
+        let rankNumber = isEvent ? "" : mission.Rank;
+
+        tableHtml += `
+            <tr>
+                <td style='padding:5px 0'>${missionName}</td>
+                <td style='padding:5px 0; text-align:center'>${rankNumber}</td>
+                <td style='padding:5px 0'>${getScriptedCapsuleBreakdown(scripted)}</td>
+            </tr>
+        `;
+    });
+
+    // Rank-ups
+    let rankupRewardScripts = balanceRanks.filter(x => scriptIds.includes(x.RewardId ?? ''));
+
+    rankupRewardScripts.forEach(rank => {
+        let scriptedId = rank.RewardId;
+        let scripted = scriptedData.find(x => x.GachaId == scriptedId);
+
+        tableHtml += `
+            <tr>
+                <td style='padding:5px 0'><span class="capsule ${scripted.MimicGachaId}">&nbsp;</span> Completing Rank ${rank.Rank}</td>
+                <td style='padding:5px 0'></td>
+                <td style='padding:5px 0'>${getScriptedCapsuleBreakdown(scripted)}</td>
+            </tr>
+        `;
+    });
+
+    return tableHtml;
+}
+
+function getScriptedCapsuleBreakdown(script) {
+    let isEvent = (currentMode != 'main');
+    let scienceId = (isEvent) ? 'darkscience' : 'science';
+    let scienceName = (isEvent) ? resourceName('darkscience') : resourceName('scientist');
+
+    let rewardsList = ``;
+
+    if (script.Science > 0) {
+        rewardsList += `<span class="resourceIcon ${scienceId}">&nbsp</span> ${shortBigNum(script.Science)} ${scienceName}<br/>`;
+    }
+    if (script.Gold > 0) {
+        rewardsList += `<img class="resourceIcon" src="${'img/shared/gold.png'}"> ${shortBigNum(script.Gold)} ${resourceName('gold')}<br/>`
+    }
+    if (script.Trophy > 0) {
+        rewardsList += `<img class="resourceIcon" src="${'img/shared/trophy.png'}"> ${shortBigNum(script.Trophy)} ${resourceName('trophy')}<br/>`
+    }
+
+    script.Card.forEach(rs => {
+        let rsBody = getResearcherFullDetailsHtml(getData().Researchers.filter(r => r.Id == rs.Id)[0]);
+        let rsPopup = `<a tabindex="0" class="researcherName" role="button" data-html="true" data-toggle="popover" data-placement="bottom" data-trigger="focus" data-content="${rsBody}" data-original-title="" title="">${researcherName(rs.Id)}</a>`;
+        rewardsList += `<span class="resourceIcon cardIcon">&nbsp</span> ${shortBigNum(rs.Value)}x ${rsPopup}<br/>`;
+    });
+
+    return rewardsList;
+}
+
+function getScriptedsByResearcher() {
+    let imgDirectory = getImageDirectory();
+    let scriptedData = getData().GachaScripts;
+    let balanceMissions = getData().Missions;
+    let balanceRanks = getData().Ranks;
+
+    let scriptedFreeId = getData().GachaFreeCycle[0].ScriptId;
+
+    let researcherData = getData().Researchers;
+    sortResearchers(researcherData);
+
+    let tableHtml = `
+        <tr>
+            <th>Researcher</th>
+            <th>Sources</th>
+        </tr>
+    `;
+
+    // Object with keys being Researcher HTML and values being a list of each reference in scripts
+    let scriptedListHtml = {};
+
+    for (let researcher of researcherData) {
+        let nameTitle = `<div class="resourceIcon" style="background-image: url('${imgDirectory}/${researcher.Id}.png');">&nbsp;</div> ${researcherName(researcher)}`;
+        let appearances = scriptedData.filter(sc => sc.Card.some(rs => rs.Id === researcher.Id));
+        scriptedListHtml[nameTitle] = [];
+        
+        if (appearances == 0) continue;
+        
+        let references = [];
+        for (let sc of appearances) {
+            // Locate where this Script can be gotten from
+
+            if (sc.GachaId == scriptedFreeId) {
+                references.push(`<span class="capsule ${sc.MimicGachaId}">&nbsp;</span> Scripted Free Capsule`);
+                continue;
+            }
+
+            let missionRefs = balanceMissions.filter(m => m.Reward.RewardId == sc.GachaId);
+            let rankupRefs = balanceRanks.filter(r => r.RewardId == sc.GachaId);
+
+            references = references.concat(
+                missionRefs.map(m => describeMission(m)),
+                rankupRefs.map(r => `<span class="capsule ${sc.MimicGachaId}">&nbsp;</span> Completing Rank ${r.Rank}`)
+            );
+        }
+        scriptedListHtml[nameTitle] = references.join("<br/>");
+    };
+    
+    for (let researcherName of Object.keys(scriptedListHtml)) {
+        let appearances = scriptedListHtml[researcherName];
+        if (appearances == '' || appearances == []) {
+            appearances = `<span style='color:#bbb'>No guaranteed copies.</span>`;
+        }
+
+        tableHtml += `
+            <tr>
+                <td style='padding:5px 0'>${researcherName}</td>
+                <td style='padding:5px 0'>${appearances}</td>
+            </tr>
+        `;
+    }
+
+    return tableHtml;
+}
+
 function getAirdropTablePopup() {
   return `<div class="keyboardShortcutHolder"><table class="table">${getAirdropTable(getData()['AirDrops'], getData()['Ranks'].length)}</table></div>`
 }
@@ -3010,35 +3258,45 @@ function getFirstMissionWithScriptedReward(researcher) {
 
 // Returns html for the researchers sub-tab where you input researcher levels.
 function getResearchersTab(mission, industryId) {
-    return getResearcherGridHtml(getResearchersByIndustry(industryId));
-}
-
-function getResearcherGridHtml(researchers, includePropeganda = true) {
-    let html = ``;
-    let formValues = getFormValuesObject();
-    sortResearchers(researchers);
-
-    // Add researchers to the grid
-    for (let researcher of researchers) {
-        html += `
-            <div class="researcherGridItem">
-                ${getResearcherCard(researcher, formValues)}
-            </div>
-        `;
+  let html = `
+    <div class="container">
+      <div class="row">`;
+  
+  let formValues = getFormValuesObject();
+  
+  let researchers = getResearchersByIndustry(industryId);
+  sortResearchers(researchers);
+  
+  // This is a huge hack until I figure out a better, more responsive way of handling this.
+  // If innerWidth is too small (e.g., a phone) only do two columns per row.
+  let columnsPerRow = (window.innerWidth > 450) ? 3 : 2;
+  
+  // Make rows with 2-3 researchers per row and end each one with a row-ending div.
+  let columnsLeft = columnsPerRow;  
+  for (let researcher of researchers) {
+    html += `<div class="col mt-3">${getResearcherCard(researcher, formValues)}</div>`;
+    
+    if (columnsLeft == 1) {
+      html += '<div class="w-100"></div>';
+      columnsLeft = columnsPerRow;
+    } else {
+      columnsLeft -= 1;
     }
-
-    // Add an additional PropagandaBoost pseudo-researcher.
-    if (includePropeganda) {
-        html += `<div id="propBoostCol" class="researcherGridItem">${getPropagandaBoostCard(formValues)}</div>`;
-    }
-
-    return `
-        <div class="container">
-            <div class="row">
-                ${html}
-            </div>
-        </div>
-    `;
+  }
+  
+  // Add an additional PropagandaBoost pseudo-researcher.
+  html += `<div id="propBoostCol" class="col mt-3">${getPropagandaBoostCard(formValues)}</div>`;
+  columnsLeft -= 1;
+  
+  // Finish out the columns to be a multiple of columnsPerRow
+  if (columnsLeft != 0) {
+    html += '<div class="col mt-1"></div>'.repeat(columnsLeft);
+  }
+  
+   html += `
+      </div>
+    </div>`;
+  return html;
 }
 
 // Maybe find a better way to do this at some point?
@@ -3197,64 +3455,75 @@ function getResearcherCard(researcher, formValues) {
   
   return `
     <a tabindex="0" class="researcherName" role="button" data-toggle="popover" data-placement="top" data-trigger="focus" data-title="${popupTitle}" data-content="${popupBody}" data-html="true">
-        <div class="researcherCard ${rarityClass} mx-auto" style="background-image: url('${imgDirectory}/${researcher.Id}.png');">
-            <div class="researcherIcon float-right" style="background-image: url('${targetIconUrl}');">&nbsp;</div>
-            <div id="${researcher.Id}-level" class="researcherLevel text-center">${levelString}</div>
+      <div class="researcherCard ${rarityClass} mx-auto" style="background-image: url('${imgDirectory}/${researcher.Id}.png');">
+        <div class="researcherIcon float-right" style="background-image: url('${targetIconUrl}');">&nbsp;</div>
+        <div id="${researcher.Id}-level" class="researcherLevel text-center">${levelString}</div>
       </div>
     </a>
 
-    <div class="center" style="margin-top: 10px">
-            <div id="${researcher.Id}-down-button" class="${downVisibilityClass} float-left researcherLevelButton ${downColorClass}">
-                <a onclick="clickLevelResearcher('${researcher.Id}', ${level - 1})" role="button" title="${downTitle}">${downLabel}</a>
-            </div>
-        
-        <div style="padding: 0px 20px; display:inline; white-space: nowrap;">
-            <div class="resourceIcon ${researcher.ModType}">&nbsp;</div>
-            <span id="${researcher.Id}-value">${valueString}</span>
-        </div>
-        
-        <div id="${researcher.Id}-up-button" class="${upVisibilityClass} researcherLevelButton float-right text-success">
-            <a onclick="clickLevelResearcher('${researcher.Id}', ${level + 1})" role="button" title="Level ${researcherName(researcher)} up to ${level + 1}">&#x25B2;</a>
-        </div>
+    <div class="my-2 text-center">
+      <div id="${researcher.Id}-down-button" class="${downVisibilityClass} float-left researcherLevelButton ${downColorClass}">
+        <a onclick="clickLevelResearcher('${researcher.Id}', ${level - 1})" role="button" title="${downTitle}">${downLabel}</a>
+      </div>
+      
+      
+      <div class="resourceIcon ${researcher.ModType}">&nbsp;</div>
+      <span id="${researcher.Id}-value">${valueString}</span>
+      
+      <div id="${researcher.Id}-up-button" class="${upVisibilityClass} researcherLevelButton float-right text-success">
+        <a onclick="clickLevelResearcher('${researcher.Id}', ${level + 1})" role="button" title="Level ${researcherName(researcher)} up to ${level + 1}">&#x25B2;</a>
+      </div>
     </div>`;
 }
 
+function getPropagandaObject() {
+  let PropagandaId = getData().Ads.filter(x => x.Name == "Propaganda Boost")[0].Rewards[0].RewardId;
+  let PropagandaData = getData().Experiments.filter(x => x.Id == PropagandaId)[0];
+
+  return {
+    Id: PropagandaId,
+    Name: ENGLISH_MAP[`experiment.${PropagandaId}.name`],
+    Power: PropagandaData.Rewards[0].Value
+  }
+}
+
 function getPropagandaBoostCard(formValues) {
+  let PropagandaData = getPropagandaObject();
   let level = formValues.ResearcherLevels.PropagandaBoost || 0;
   
   let imgDirectory = getImageDirectory();
-  let backgroundImageUrl = (level == 0) ? "img/shared/propaganda_boost_off.png" : `${imgDirectory}/propaganda_boost_on.png`;
+  let backgroundImageUrl = (level == 0) ? 'img/shared/propaganda_boost_off.png' : `${imgDirectory}/propaganda_boost_on.png`;
   let targetIconUrl = `${imgDirectory}/multi-industry.png`;
   
   let levelText = (level == 0) ? "Inactive" : "Active";
-  let valueString = (level == 0) ? "" : "x2";
+  let valueString = (level == 0) ? "" : `x${PropagandaData.Power}`;
   
   let downVisibilityClass = (level <= 0) ? "invisible" : "visible";
   let upVisibilityClass = (level >= 1) ? "invisible" : "visible";
   
   return `
-    <a tabindex="0" class="researcherName" role="button" data-toggle="popover" data-placement="top" data-trigger="focus" data-title="Propaganda Boost" data-content="Watch ads to boost the output of all generators by 2x" data-html="true">
+    <a tabindex="0" class="researcherName" role="button" data-toggle="popover" data-placement="top" data-trigger="focus" data-title="${PropagandaData.Name}" data-content="Watch ads or purchase the ${ENGLISH_MAP['supreme.pass']} to boost the output of all generators by x${PropagandaData.Power}" data-html="true">
       <div class="researcherCard propagandaBoost mx-auto" style="background-image: url('${backgroundImageUrl}');">
         <div class="researcherIcon float-right" style="background-image: url('${targetIconUrl}');">&nbsp;</div>
         <div class="researcherLevel text-center">${levelText}</div>
       </div>
 
-      <div class="center" style="margin-top: 8px">
+      <div class="my-2 text-center">
         <div class="${downVisibilityClass} float-left researcherLevelButton text-danger">
-          <a onclick="clickChangePropagandaBoost(0)" role="button" title="Disable Propaganda Boost">&#x25BC;</a>
+          <a onclick="clickChangePropagandaBoost(0)" role="button" title="Disable ${PropagandaData.Name}">&#x25BC;</a>
         </div>
         
-        <div style="padding: 0px 20px;">
-            <div class="resourceIcon power">&nbsp;</div>
-            ${valueString}
-        </div>
+        
+        <div class="resourceIcon power">&nbsp;</div>
+        ${valueString}
         
         <div class="${upVisibilityClass} researcherLevelButton float-right text-success">
-          <a onclick="clickChangePropagandaBoost(1)" role="button" title="Enable Propaganda Boost">&#x25B2;</a>
+          <a onclick="clickChangePropagandaBoost(1)" role="button" title="Enable ${PropagandaData.Name}">&#x25B2;</a>
         </div>
       </div>
     </a>`;
 }
+
 
 // Returns the multiplier (>1x) or chance (0-1) given a researcher and their level.  If level is -1, the user's override is returned.
 function getValueForResearcherLevel(researcher, level) {
