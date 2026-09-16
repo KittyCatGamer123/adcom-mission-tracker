@@ -16,6 +16,10 @@ body {
     color: #eee;
 }
 
+.modal-dialog {
+    max-width: 560px !important;
+}
+
 a {
     color: #3f9cff;
 }

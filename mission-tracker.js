@@ -208,23 +208,23 @@ function applyIconCssVariables() {
     setIconCssVar('--icon-darkscience', 'event/darkscience.png');
     setIconCssVar('--icon-science', 'main/scientist.png');
     setIconCssVar('--icon-comrade', 'shared/comrade.png');
-    setIconCssVar('--icon-comrades-per-sec', 'shared/comrades_per_second.png');
-    setIconCssVar('--icon-boost-power', 'shared/boost_power.png');
-    setIconCssVar('--icon-discount', 'shared/discount.png');
-    setIconCssVar('--icon-crit-chance', 'shared/crit_chance.png');
-    setIconCssVar('--icon-crit-power', 'shared/crit_power.png');
-    setIconCssVar('--icon-speed', 'shared/speed.png');
+    setIconCssVar('--icon-comrades-per-sec', 'shared/abilities/comrades_per_second.png');
+    setIconCssVar('--icon-boost-power', 'shared/abilities/boost_power.png');
+    setIconCssVar('--icon-discount', 'shared/abilities/discount.png');
+    setIconCssVar('--icon-crit-chance', 'shared/abilities/crit_chance.png');
+    setIconCssVar('--icon-crit-power', 'shared/abilities/crit_power.png');
+    setIconCssVar('--icon-speed', 'shared/abilities/speed.png');
     setIconCssVar('--icon-card', 'shared/card.png');
 }
 
-function collapseableCard(cardId, cardHeaderHtml, cardBodyHtml, selected = false) {
+function collapseableCard(cardId, cardHeaderHtml, cardBodyHtml, selected = false, styleOverrides = "") {
     return `
-    <div class="card">
+    <div class="card"">
         <div class="card-header scheduleHeader ${selected ? "selected" : ""}" data-toggle="collapse" data-target="#${cardId}" aria-controls="${cardId}">
             ${cardHeaderHtml}
         </div>
         <div class="collapse" id="${cardId}">
-            <div class="card-body">
+            <div class="card-body" style="${styleOverrides}">
                 ${cardBodyHtml}
             </div>
         </div>
@@ -2949,67 +2949,84 @@ function getAirdropValue(airdrops, rank) {
 }
 
 function getCapsuleTablePopup() {
-  if (currentMode !== 'event') {
-    return "<p>Coming soon for this mode!</p>"
-  }
-  let capsuleRoot = getData()['GachaLootTable'];
-  let output = [];
+    return `Currently under construction!`;
 
-  for (let i = 0; i < capsuleRoot.length; i++) {
-    if (capsuleRoot[i]['Type'] === 'Normal') {
-      // capsule has rank-variable rewards, so we are interested in reporting its contents
-      let gachaName = `gacha.${capsuleRoot[i]['Id']}.name.simple`;
-      output.push(`<h6>${ENGLISH_MAP[gachaName]} Capsule</h6><div class="keyboardShortcutHolder"><table class="table">${getCapsuleTable(capsuleRoot[i], getData()['Ranks'].length)}</table></div>`)
-    }
-  }
+    let output = [];
+    getData()['GachaLootTable'].forEach(capsule => {
+        if (capsule['Type'] === 'Normal') {
+            let gachaName = ENGLISH_MAP[`gacha.${capsule['Id']}.name`] + " Capsule";
+            let gachaHeader = `<span class="resourceIcon ${capsule['Id']}">&nbsp;</span> ${gachaName} <span class="float-right"><span class="ml-2">(+)</span></span>`;
+            let gachaBody = `<table class="table">${getCapsuleTable(capsule)}</table>`;
+            output.push(collapseableCard(`capsule-${capsule['Id']}`, gachaHeader, gachaBody, selected=false, styleOverrides="padding:0"));
+        }
+    });
 
-  return output.join('');
+    return output.join('');
 }
 
-function getCapsuleTable(capsule, ranks) {
-  let rows = [];
-  let mode = currentMode; // we need different behavior if it's an Event or Evergreen
-  let ranksRoot = getData()['Ranks'];
+function getCapsuleTable(gachaData) {
+    const gachaKeys = Object.keys(gachaData);
+    const weightOrdering = ["RareWeight", "EpicWeight", "SupremeWeight", "LteRareWeight"];
+    
+    let ranksRoot = getData()['Ranks'];
+    let activeRarities = [];
+    
+    let gachaType = gachaData["Type"];
 
-  for (let i = 0; i <= ranks; i++) {
-    let cols = [];
-    if (i <= 0) {
-      // header
-      let jsonKeys = Object.keys(capsule);
+    let tableData = {
+        "#": [],
+        "Cards": [],
+        "Common": []
+    };
 
-      cols.push(`<th>Rank</th>`);
-      cols.push(`<th>Cards</th>`);
-      cols.push(`<th>Common</th>`);
-      
-      for (let j = 0; j < jsonKeys.length; j++) {
-        if (jsonKeys[j].endsWith("Weight") && jsonKeys[j].indexOf("CardWeight") === -1 && capsule[jsonKeys[j]] !== -1) {
-          // possible candidate for weight rarity
-          let replacedName = jsonKeys[j].replace('Weight', '').replace('Lte', '');
-          cols.push(`<th>${replacedName}</th>`);
+    weightOrdering.forEach(weight => {
+        if (gachaData[weight] != null) {
+            if (gachaData[weight] != -1) {
+                let rarityName = ENGLISH_MAP[`researcher.rarity.${weight.replace('Weight','').toLowerCase()}.name`];
+                activeRarities.push(weight);
+                tableData[rarityName] = [];
+            }
         }
-      }
+    });
 
-      if (mode === "event") {
-        cols.push(`<th>${resourceName('darkscience')}</th>`);
-        cols.push(`<th>${resourceName('trophy')}</th>`);
-      } else {
-        cols.push(`<th>${resourceName('science')}</th>`);
-      }
-    } else {
-      // iterate through capsule rewards
-      cols.push(`<td>${i}</td>`);
-      cols.push(`<td>${Math.round(capsule['CardWeight'] * ranksRoot[i - 1]['NormalGachaMultiplier'])}</td>`);
-      cols.push(`<td>${getCapsuleDistribution(capsule, ranksRoot[i - 1], "LteCommon")}</td>`);
-      cols.push(`<td>${getCapsuleDistribution(capsule, ranksRoot[i - 1], "LteRare")}</td>`);
-      cols.push(`<td>${Math.ceil(capsule['ScienceMin'] * ranksRoot[i - 1]['NormalGachaMultiplierScience'])}&#8211;${Math.ceil(capsule['ScienceMax'] * ranksRoot[i - 1]['NormalGachaMultiplierScience'])}</td>`);
-      cols.push(`<td>${capsule['TrophyMin'] * ranksRoot[i - 1]['GachaMultiplierTrophy']}</td>`);
+    let scienceName;
+    let pointsId; // Trophies or SpecOps?
+
+    if (gachaKeys.includes("ScienceMin")) {        
+        scienceName = IsEvent ? resourceName("darkscience") : resourceName("scientist");
+        tableData[scienceName] = [];
+    }
+    
+    pointsId = IsEvent ? "Trophy" : "Points";
+
+    if (gachaKeys.includes(pointsId+"Min")) {        
+        tableData[pointsId] = [];
+    }
+    
+    for (let rankNum = 0; rankNum < ranksRoot.length; rankNum++) {
+        let rankDat = ranksRoot[rankNum];
+
+        tableData["#"].push(rankNum+1);
+        tableData["Cards"].push(Math.round(gachaData['CardWeight'] * rankDat[`${gachaType}GachaMultiplier`]));
+
+        // Science
+        if (Object.keys(tableData).includes(scienceName)) {
+            let scienceMult = rankDat[`${gachaType}GachaMultiplierScience`];
+            tableData[scienceName].push(`${Math.ceil(gachaData['ScienceMin'] * scienceMult)} &#8211; ${Math.ceil(gachaData['ScienceMax'] * scienceMult)}`);
+        }
+
+        // Specops / Trophies
+        if (Object.keys(tableData).includes(pointsId)) {
+            tableData[pointsId].push(`${gachaData['TrophyMin'] * rankDat['GachaMultiplierTrophy']}`);
+        }
     }
 
-    let row = cols.join('');
-    rows.push(`<tr>${row}</tr>`);
-  }
+    console.log(tableData)
 
-  return rows.join('');
+    let result = "";
+    Object.keys(tableData).forEach(k => result += `<th>${k}</th>`);
+
+    return result;
 }
 
 // Very bad code that only works for Events so far. Todo: analyze Evergreen capsule rewards and implement a symbiotic solution.
@@ -3202,13 +3219,13 @@ function describeGenerator(generator, researchers, formValues) {
   
   let qtyProduced = generator.Generate.Qty * genValues.Power;
   html += `<img class='resourceIcon mr-1' src='${imgDirectory}/${generator.Generate.Resource}.png' title='${resourceName(generator.Generate.Resource)}'>${shortBigNum(qtyProduced)} `;
-  html += `per <img class='resourceIcon mx-1' src='img/shared/speed.png'>${getEta(genTime)}<div class='my-3'></div>`;
+  html += `per <img class='resourceIcon mx-1' src='img/shared/abilities/speed.png'>${getEta(genTime)}<div class='my-3'></div>`;
   
-  html += `<img class='resourceIcon mr-1' src='img/shared/boost_power.png' title='Power'>x${shortBigNum(genValues.Power)} `;
-  html += `<img class='resourceIcon mx-1' src='img/shared/discount.png' title='Power'>x${shortBigNum(genValues.CostReduction)} `;
-  html += `<img class='resourceIcon mx-1' src='img/shared/speed.png' title='Power'>x${shortBigNum(genValues.Speed)}<div class='my-1'></div>`;
-  html += `<img class='resourceIcon mr-1' src='img/shared/crit_chance.png' title='Crit Chance'>${shortBigNum(genValues.CritChance * 100)}% `;
-  html += `<img class='resourceIcon mx-1' src='img/shared/crit_power.png' title='Crit Power'>x${shortBigNum(genValues.CritPower)}<div class='my-3'></div>`;
+  html += `<img class='resourceIcon mr-1' src='img/shared/abilities/boost_power.png' title='Power'>x${shortBigNum(genValues.Power)} `;
+  html += `<img class='resourceIcon mx-1' src='img/shared/abilities/discount.png' title='Discount'>x${shortBigNum(genValues.CostReduction)} `;
+  html += `<img class='resourceIcon mx-1' src='img/shared/abilities/speed.png' title='Speed'>x${shortBigNum(genValues.Speed)}<div class='my-1'></div>`;
+  html += `<img class='resourceIcon mr-1' src='img/shared/abilities/crit_chance.png' title='Crit Chance'>${shortBigNum(genValues.CritChance * 100)}% `;
+  html += `<img class='resourceIcon mx-1' src='img/shared/abilities/crit_power.png' title='Crit Power'>x${shortBigNum(genValues.CritPower)}<div class='my-3'></div>`;
   
   let totalPerSec = qtyProduced * (genValues.CritChance * genValues.CritPower + 1 - genValues.CritChance) / genTime;
   if (totalPerSec < 1e4) {
