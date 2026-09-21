@@ -2949,11 +2949,9 @@ function getAirdropValue(airdrops, rank) {
 }
 
 function getCapsuleTablePopup() {
-    return `Currently under construction!`;
-
     let output = [];
     getData()['GachaLootTable'].forEach(capsule => {
-        if (capsule['Type'] === 'Normal') {
+        if (capsule['Type'] !== 'Scripted') {
             let gachaName = ENGLISH_MAP[`gacha.${capsule['Id']}.name`] + " Capsule";
             let gachaHeader = `<span class="resourceIcon ${capsule['Id']}">&nbsp;</span> ${gachaName} <span class="float-right"><span class="ml-2">(+)</span></span>`;
             let gachaBody = `<table class="table">${getCapsuleTable(capsule)}</table>`;
@@ -2967,11 +2965,13 @@ function getCapsuleTablePopup() {
 function getCapsuleTable(gachaData) {
     const gachaKeys = Object.keys(gachaData);
     const weightOrdering = ["RareWeight", "EpicWeight", "SupremeWeight", "LteRareWeight"];
+
+    let gachaType = gachaData["Type"];
+    let isFixed = (gachaType == "Fixed");
     
     let ranksRoot = getData()['Ranks'];
+    let tableLength = isFixed ? 1 : ranksRoot.length;
     let activeRarities = [];
-    
-    let gachaType = gachaData["Type"];
 
     let tableData = {
         "#": [],
@@ -2981,20 +2981,24 @@ function getCapsuleTable(gachaData) {
 
     weightOrdering.forEach(weight => {
         if (gachaData[weight] != null) {
-            if (gachaData[weight] != -1) {
-                let rarityName = ENGLISH_MAP[`researcher.rarity.${weight.replace('Weight','').toLowerCase()}.name`];
-                activeRarities.push(weight);
+            if (gachaData[weight] > 0) {
+                let rarity = weight.replace('Weight','');
+                let rarityName = ENGLISH_MAP[`researcher.rarity.${rarity.toLowerCase()}.name`];
+                activeRarities.push(rarity);
                 tableData[rarityName] = [];
             }
         }
     });
+    activeRarities.reverse();
 
     let scienceName;
     let pointsId; // Trophies or SpecOps?
 
-    if (gachaKeys.includes("ScienceMin")) {        
-        scienceName = IsEvent ? resourceName("darkscience") : resourceName("scientist");
-        tableData[scienceName] = [];
+    if (gachaKeys.includes("ScienceMin")) {
+        if (gachaData["ScienceMin"] != 0) {
+          scienceName = IsEvent ? resourceName("darkscience") : resourceName("scientist");
+          tableData[scienceName] = [];
+        }
     }
     
     pointsId = IsEvent ? "Trophy" : "Points";
@@ -3003,63 +3007,100 @@ function getCapsuleTable(gachaData) {
         tableData[pointsId] = [];
     }
     
-    for (let rankNum = 0; rankNum < ranksRoot.length; rankNum++) {
+    for (let rankNum = 0; rankNum < tableLength; rankNum++) {
         let rankDat = ranksRoot[rankNum];
-
         tableData["#"].push(rankNum+1);
-        tableData["Cards"].push(Math.round(gachaData['CardWeight'] * rankDat[`${gachaType}GachaMultiplier`]));
+
+        // Cards
+        let cardWeight = isFixed ? gachaData['CardWeight'] : Math.round(gachaData['CardWeight'] * rankDat[`${gachaType}GachaMultiplier`]);
+        tableData["Cards"].push(cardWeight);
+
+        let commonCount = cardWeight;
+        activeRarities.forEach(rar => {
+            let rarityName = ENGLISH_MAP[`researcher.rarity.${rar.toLowerCase()}.name`];
+            let rarityCount = cardWeight / gachaData[`${rar}Weight`];
+            commonCount -= rarityCount;
+            
+            let rarityUpChance = rarityCount - Math.floor(rarityCount);
+
+            if (rar == "Supreme") {
+              // The game caps the supreme income per cap at 1, so only show chances
+              // Remove trailing zeros, cap % as 100%
+              let chance = Math.min(100, (rarityCount * 100)).toFixed(3).replace(/\.?0+$/, "");
+              tableData[rarityName].push(`${chance}%`);
+              return;
+            }
+
+            // Flat value (100%)
+            if (rarityUpChance == 0) {
+              tableData[rarityName].push(`${rarityCount} (100%)`);
+            }
+            else {
+              if (Math.floor(rarityCount) == 0 && Math.ceil(rarityCount) == 1) {
+                let chance = (rarityUpChance * 100).toFixed(3).replace(/\.?0+$/, ""); // Remove trailing zeros
+                tableData[rarityName].push(`${chance}%`);
+              }
+              else {
+                let chanceUp = percentageConversion(rarityUpChance);
+                let chanceDown = percentageConversion(1 - rarityUpChance);
+
+                tableData[rarityName].push(`${Math.floor(rarityCount)} (${chanceDown})<br/>${Math.ceil(rarityCount)} (${chanceUp})`)
+              }
+            }
+        });
+
+        if (commonCount != 0) {
+          let commonUpChance = commonCount - Math.floor(commonCount);
+          if (commonUpChance == 0) {
+              tableData["Common"].push(`${commonCount} (100%)`);
+          }
+          else {
+            let chanceUp = percentageConversion(commonUpChance);
+            let chanceDown = percentageConversion(1 - commonUpChance);
+            tableData["Common"].push(`${Math.floor(commonCount)} (${chanceDown})<br/>${Math.ceil(commonCount)} (${chanceUp})`)
+          }
+        }
+        else {
+          delete tableData['Common']
+        }
 
         // Science
         if (Object.keys(tableData).includes(scienceName)) {
-            let scienceMult = rankDat[`${gachaType}GachaMultiplierScience`];
-            tableData[scienceName].push(`${Math.ceil(gachaData['ScienceMin'] * scienceMult)} &#8211; ${Math.ceil(gachaData['ScienceMax'] * scienceMult)}`);
+            if (isFixed) {
+              tableData[scienceName].push(bigNum(gachaData['ScienceMin']));
+            }
+            else {
+              let scienceMult = rankDat[`${gachaType}GachaMultiplierScience`];
+              let scienceMin = Math.ceil(gachaData['ScienceMin'] * scienceMult);
+              let scienceMax = Math.ceil(gachaData['ScienceMax'] * scienceMult);
+              tableData[scienceName].push(`${bigNum(scienceMin)} &#8211; ${bigNum(scienceMax)}`);
+            }
         }
 
         // Specops / Trophies
         if (Object.keys(tableData).includes(pointsId)) {
-            tableData[pointsId].push(`${gachaData['TrophyMin'] * rankDat['GachaMultiplierTrophy']}`);
+            tableData[pointsId].push(gachaData[`${pointsId}Min`] * rankDat[`GachaMultiplier${pointsId}`]);
         }
     }
 
-    console.log(tableData)
-
-    let result = "";
+    let result = "<tr>";
     Object.keys(tableData).forEach(k => result += `<th>${k}</th>`);
+    result += `</tr>`;
+
+    for (let row = 0; row < tableLength; row++) {
+      result += `<tr>`;
+      Object.keys(tableData).forEach(k => {
+        result += `<td>${tableData[k][row]}</td>`;
+      })
+      result += `</tr>`;
+    }
 
     return result;
 }
 
-// Very bad code that only works for Events so far. Todo: analyze Evergreen capsule rewards and implement a symbiotic solution.
-function getCapsuleDistribution(capsule, rank, rarity) {
-  let n = Math.round(capsule['CardWeight'] * rank['NormalGachaMultiplier']);
-  let rareCountBase = Math.round(Math.floor(n / capsule['LteRareWeight']));
-  let rareCountOneUp = (n % capsule['LteRareWeight']) / capsule['LteRareWeight'];
-  let excludeNextOneUp = false;
-
-  if (n % capsule['LteRareWeight'] === 0) {
-    excludeNextOneUp = true;
-  }
-
-  if (rarity.indexOf("Common") !== -1) {
-    // common
-    if (!excludeNextOneUp) {
-      return `${n - rareCountBase - 1} (${percentageConversion(rareCountOneUp)})<br>${n - rareCountBase} (${percentageConversion(1 - rareCountOneUp)})`;
-    } else {
-      return `${n - rareCountBase} (${percentageConversion(1)})`;
-    }
-  } else {
-    // rare
-    if (!excludeNextOneUp) {
-      return `${rareCountBase} (${percentageConversion(1 - rareCountOneUp)})<br>${rareCountBase + 1} (${percentageConversion(rareCountOneUp)})`;
-    } else {
-      return `${rareCountBase} (${percentageConversion(1)})`;
-    }
-  }
-}
-
 // quick helper function to convert float to percentage
-function percentageConversion(f) {
-    return `${(parseFloat(f) * 100).toFixed(0)}%`
+function percentageConversion(f, decimalOverride = 0) {
+    return `${(parseFloat(f) * 100).toFixed(decimalOverride)}%`
 }
 
 // Returns html for the calculator's sub-tab where you input generator and resource counts.
