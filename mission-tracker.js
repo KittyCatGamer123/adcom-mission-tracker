@@ -283,6 +283,7 @@ function getSchedulePopupEvent(eventInfo) {
 // get HTML for all balances
 function getAllEventBalanceHtml() {
     let data = ``;
+    let selectedEvent = eventScheduleInfo.BalanceId ?? "";
 
     // Put Motherland at the start of the list
     let balancesList = Object.keys(DATA);
@@ -315,7 +316,7 @@ function getAllEventBalanceHtml() {
 
         let headerContent = `<img src='img/shared/themeicons/${themeId}.png' class="scheduleIconLarge"> ${name} <span class="float-right"><span class="ml-2">(+)</span></span>`;
         let bodyContent = `<div><span class="float-right"><a href="${siteArgument}">View in Tracker</a></span></div><div><strong>Last Update: </strong>${balanceLastUpdate}</div>`;
-        data += collapseableCard(`scheduleBody-${themeId}`, headerContent, bodyContent);
+        data += collapseableCard(`scheduleBody-${themeId}`, headerContent, bodyContent, selected=(balId == selectedEvent));
     });
 
     return data;
@@ -3968,7 +3969,7 @@ function doProductionSim() {
   
   if (simData.Errors != 0) {
     $('#result').text(`Please fix ${simData.Errors} issue${(simData.Errors > 1)?"s":""}, and Calculate again.`);
-    $('#result').effect('highlight', {}, 2000);
+    $('#result').effect('highlight', { color: 'var(--highlight-color)' }, 2000);
     return;
   } else {
     $('#result').text("");
@@ -4018,7 +4019,7 @@ function doProductionSim() {
     }
   }
   
-  $('#result').effect('highlight', {}, 2000);
+  $('#result').effect('highlight', { color: 'var(--highlight-color)' }, 2000);
 }
 
 // Returns a string 
