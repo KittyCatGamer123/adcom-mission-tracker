@@ -219,7 +219,7 @@ function applyIconCssVariables() {
 
 function collapseableCard(cardId, cardHeaderHtml, cardBodyHtml, selected = false, styleOverrides = "") {
     return `
-    <div class="card"">
+    <div class="card">
         <div class="card-header scheduleHeader ${selected ? "selected" : ""}" data-toggle="collapse" data-target="#${cardId}" aria-controls="${cardId}">
             ${cardHeaderHtml}
         </div>
@@ -240,44 +240,187 @@ function getSchedulePopup() {
 
 // Returns the HTML for the schedule event block for a given event
 function getSchedulePopupEvent(eventInfo) {
-    let shortOptions = { weekday: 'short', month: 'short', day: 'numeric' };
-    let longOptions = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', timeZoneName: 'short' };
+  let shortOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+  let longOptions = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', timeZoneName: 'short' };
 
-    let start = new Date(eventInfo.StartTimeMillis);
-    let startShort = start.toLocaleDateString(undefined, shortOptions);
-    let startLong = start.toLocaleDateString(undefined, longOptions);
+  let start = new Date(eventInfo.StartTimeMillis);
+  let startShort = start.toLocaleDateString(undefined, shortOptions);
+  let startLong = start.toLocaleDateString(undefined, longOptions);
 
-    let end = new Date(eventInfo.EndTimeMillis);
-    let endShort = end.toLocaleDateString(undefined, shortOptions)
-    let endLong = end.toLocaleDateString(undefined, longOptions);
+  let end = new Date(eventInfo.EndTimeMillis);
+  let endShort = end.toLocaleDateString(undefined, shortOptions)
+  let endLong = end.toLocaleDateString(undefined, longOptions);
 
-    let lteId = eventInfo.LteId;
-    let name = ENGLISH_MAP[`lte.${eventInfo.ThemeId}.name`];
+  let lteId = eventInfo.LteId;
+  let name = ENGLISH_MAP[`lte.${eventInfo.ThemeId}.name`];
 
-    let isCurrent = false;
-    if (IsEvent && eventInfo.LteId == eventScheduleInfo.LteId) {
-        // This is the currently-tracked event, highlight the header.
-        isCurrent = true;
+  let isCurrent = false;
+  if (IsEvent && eventInfo.LteId == eventScheduleInfo.LteId) {
+      // This is the currently-tracked event, highlight the header.
+      isCurrent = true;
+  }
+  
+  let top3RewardIcons = ``;
+  if (!IsAges) {
+    top3RewardIcons = eventInfo.Rewards.filter(x => x["IsFeatured"]).map(r => getRewardIcon(r.MilestoneReward)).join('');
+  }
+  else {
+    top3RewardIcons = eventInfo.Rewards.slice(-3).map(r => getRewardIcon(r)).join('');
+  }
+
+  let eventRewardNavs = ``;
+  let eventRewardTables = ``;
+
+  let sectionId = `schedule-milestone-rewards-${lteId}`;
+  let eventRewardContents = ``;
+
+  // Milestones
+
+  eventRewardNavs += `
+    <li class="nav-item">
+      <a class="nav-link active" id="${sectionId}-tab" data-toggle="tab" href="#${sectionId}" role="tab" aria-controls="${sectionId}" aria-selected="true">
+        <div class="resourceIcon" style="background-image: url('img/shared/leaderboard_milestone.png');">&nbsp;</div>
+        Milestones
+      </a>
+    </li>
+  `;
+
+  for (let r = 0; r < eventInfo.Rewards.length; r++) {
+    eventRewardContents += `
+      <tr>
+        <td style="padding:0">${r+1}</td>
+        <td style="padding:0">${describeScheduleRankReward(eventInfo.Rewards[r]["MilestoneReward"])}</td>
+      </tr>
+    `;
+  }
+
+  eventRewardTables += `
+    <div id="${sectionId}" class="tab-pane fade active show" role="tabpanel" aria-labelledby="${sectionId}-tab">
+      <table class="table">
+        <tr>
+          <th>Rank</th>
+          <th>Reward</th>
+        </tr>
+        ${eventRewardContents}
+      </table>
+    </div>
+  `;
+
+  // Shortboard
+
+  if (!IsAges) {
+    let shortboardData = SCHEDULE_CYCLES.LteShortLeaderboards.filter(x => x.LeaderboardId == eventInfo.LeaderboardId)[0];
+    
+    if (shortboardData != undefined) {
+      sectionId = `schedule-segment-rewards-${lteId}`;
+      eventRewardNavs += `
+        <li class="nav-item">
+            <a class="nav-link" id="${sectionId}-tab" data-toggle="tab" href="#${sectionId}" role="tab" aria-controls="${sectionId}" aria-selected="false">
+              <div class="resourceIcon" style="background-image: url('img/shared/leaderboard_segment.png');">&nbsp;</div>
+              Leaderboard
+            </a>
+        </li>
+      `;
+
+      eventRewardContents = ``;
+
+      for (let r = 0; r < shortboardData.BracketRewards.length; r++) {
+        eventRewardContents += `
+          <tr>
+            <td style="padding:0">${ordinalConversion(r+1)}</td>
+            <td style="padding:0">${describeScheduleRankReward(shortboardData.BracketRewards[r])}</td>
+          </tr>
+        `;
+      }
+
+      eventRewardTables += `
+        <div id="${sectionId}" class="tab-pane fade" role="tabpanel" aria-labelledby="${sectionId}-tab">
+          <table class="table">
+            <tr>
+              <th>Placement</th>
+              <th>Reward</th>
+            </tr>
+            ${eventRewardContents}
+          </table>
+        </div>
+      `;
     }
+  }
 
-    let top3RewardIcons = eventInfo.Rewards.slice(-3).map(r => getRewardIcon(r)).join('');
-    let completionRewards = eventInfo.Rewards.map(r => `<li><span class="rewardListIconWrapper">${getRewardIcon(r)}</span> ${describeScheduleRankReward(r)}</li>`).join('');
+  // Global
 
-    let scheduleId = `scheduleBody-${lteId}`;
-    let scheduleHeader = `
-        <img src='img/shared/themeicons/${eventInfo.ThemeId}.png' class="scheduleIconLarge">
-        ${startShort} - ${endShort}
-        <span class="float-right">${top3RewardIcons} <span class="ml-2">(+)</span></span>
+  let globalData = SCHEDULE_CYCLES.LteLeaderboards.filter(x => x.LeaderboardId == eventInfo.GlobalLeaderboardId)[0];
+
+  if (globalData != undefined) {
+    sectionId = `schedule-global-rewards-${lteId}`;
+    eventRewardNavs += `
+      <li class="nav-item">
+        <a class="nav-link" id="${sectionId}-tab" data-toggle="tab" href="#${sectionId}" role="tab" aria-controls="${sectionId}" aria-selected="false">
+          <div class="resourceIcon" style="background-image: url('img/shared/leaderboard_global.png');">&nbsp;</div>
+          Global
+        </a>
+      </li>
     `;
-    let scheduleBody = `
-        <div><strong>${name}</strong><span class="float-right"><a href="?event=${eventInfo.EndTimeMillis}">View in Tracker</a></span></div><br />
-        <strong>Starts:</strong> ${startLong}<br />
-        <strong>Ends:</strong> ${endLong}<br /><br />
-        <strong>Rank Completion Rewards:</strong><br />
-        <ol>${completionRewards}</ol>
-    `;
 
-    return collapseableCard(scheduleId, scheduleHeader, scheduleBody, selected = isCurrent);
+    eventRewardContents = ``;
+
+    for (let posIdx = 0; posIdx < globalData.BracketRewards.length; posIdx++) {
+      let bracketDat = globalData.Brackets[posIdx];
+      let position = (bracketDat["IsPercentage"] == true) ? percentageConversion(bracketDat["Value"]) : bracketDat["Value"];
+      
+      eventRewardContents += `
+        <tr>
+          <td style="padding:0">Top ${position}</td>
+          <td style="padding:0">${describeScheduleRankReward(globalData.BracketRewards[posIdx])}</td>
+        </tr>
+      `;
+    }
+  
+    eventRewardTables += `
+      <div id="${sectionId}" class="tab-pane fade" role="tabpanel" aria-labelledby="${sectionId}-tab">
+        <table class="table">
+          <tr>
+            <th>Placement</th>
+            <th>Reward</th>
+          </tr>
+          ${eventRewardContents}
+        </table>
+      </div>
+    `;
+  }
+
+
+  let scheduleId = `scheduleBody-${lteId}`;
+  let scheduleHeader = `
+    <img src='img/shared/themeicons/${eventInfo.ThemeId}.png' class="scheduleIconLarge">
+    ${startShort} - ${endShort}
+    <span class="float-right">${top3RewardIcons} <span class="ml-2">(+)</span></span>
+  `;
+  let scheduleBody = `
+    <div><strong>${name}</strong><span class="float-right"><a href="?event=${eventInfo.EndTimeMillis}">View in Tracker</a></span></div><br />
+    <strong>Starts:</strong> ${startLong}<br />
+    <strong>Ends:</strong> ${endLong}<br /><br />
+    <strong>Event Rewards:</strong><br /><br />
+    
+    <ul class="nav nav-tabs" role="tablist">${eventRewardNavs}</ul>
+    <div class="tab-content">${eventRewardTables}</div>
+  `;
+
+  return collapseableCard(scheduleId, scheduleHeader, scheduleBody, selected = isCurrent);
+}
+
+// Function for adding an ordinal to a number (for leaderboard placements usually)
+// 1 -> 1st, 2 -> 2nd, 5 -> 5th, etc.
+function ordinalConversion(inputNumber) {
+  let lastDigit = inputNumber.toString()[inputNumber.toString().length - 1];
+  let presets = { 1: "st", 2: "nd", 3: "rd" };
+  let numberExclusions = [11, 12, 13];
+
+  if (!Object.keys(presets).includes(lastDigit) || numberExclusions.includes(inputNumber)) {
+    return `${inputNumber}th`
+  } 
+
+  return `${inputNumber}${presets[lastDigit]}`
 }
 
 // get HTML for all balances
@@ -399,7 +542,9 @@ function updateSoonestOneOff(oneOffEvent, now, soonestEvents, oneOffHours) {
       ThemeId: oneOffEvent.ThemeId,
       StartTimeMillis: startTimeMillis,
       EndTimeMillis: endTimeMillis,
-      Rewards: getRewardsById(oneOffEvent.RewardId)
+      Rewards: getMilestoneRewardsById(oneOffEvent.RewardId),
+      LeaderboardId: oneOffEvent.LteShortLeaderboardId,
+      GlobalLeaderboardId: oneOffEvent.LeaderboardId
     });
   }
 }
@@ -496,12 +641,13 @@ function getHoursPerBalanceId() {
 }
 
 // Returns just the rank rewards array for a given rewardId
-function getRewardsById(rewardId) {
-  let reward = SCHEDULE_CYCLES.LteRewards.find(r => r.RewardId == rewardId);
-  if (reward) {
-    return reward.Rewards;
-  } else {
-    return [];
+function getMilestoneRewardsById(rewardId) {
+  if (!IsAges) {
+    // Returns the choice-based rewards tree
+    return SCHEDULE_CYCLES.LteMilestones.find(r => r.MilestoneId == rewardId).MilestoneRanks;
+  }
+  else {
+    return SCHEDULE_CYCLES.LteRewards.find(r => r.RewardId == rewardId).Rewards;
   }
 }
 
@@ -998,9 +1144,25 @@ function renderMissions() {
     } else {
       // A generic EVENT rank
       // Create the event rank popup.  Start with Completion Reward, if possible
-      let rankReward = eventScheduleInfo.Rewards[rank - 1];
-      let popupHtml = rankReward ? `<strong>Completion Reward:</strong><br />${getRewardIcon(rankReward, true)} ${describeScheduleRankReward(rankReward)}` : "";
-      
+      let popupHtml = "";
+
+      if (rank < getData().Ranks.length && eventScheduleInfo.Rewards[0] != undefined) {
+        let formattedRewards = "";
+
+        if (IsAges) {
+          let rankRewards = eventScheduleInfo.Rewards[rank - 1];
+          formattedRewards = describeScheduleRankReward(rankRewards).replaceAll('"', "'");
+        }
+        else {
+          let rankRewards = eventScheduleInfo.Rewards.filter(r => r.Rank == rank)[0];
+          let rankKeys = Object.keys(rankRewards).filter(x => x.includes("MilestoneReward"));
+          let detailedRewards = rankKeys.map(r => describeScheduleRankReward(rankRewards[r]));
+          formattedRewards = detailedRewards.join("<br/>").replaceAll('"', "'");
+        }
+        
+        popupHtml = `<strong>Completion Reward(s):</strong><br />${formattedRewards}`;
+      }
+
       // On the special case of Rank 1, the popup shows the first scripted free capsule.
       let firstFreeId = getData().GachaFreeCycle[0].ScriptId;
       if (rank == 1 && firstFreeId) {
@@ -1281,29 +1443,76 @@ function getEventCurrentRankTitle() {
   return eventRankTitles[missionData.Completed.Remaining.length];
 }
 
-function describeScheduleRankReward(reward) {
+function describeScheduleRankReward(reward, includePopup = true, eventInfo = {}) {
+  if (Object.keys(reward).includes("MilestoneReward")) {
+    reward = reward["MilestoneReward"];
+  }
+
   let rewardId = reward.RewardId;
   let singularOrPlural = (reward.Value == 1) ? "singular" : "plural";
+  let rewardIcon = `<span class="rewardListIconWrapper">${getRewardIcon(reward, false)}</span>`;
 
   switch (reward.Reward) {
     case "Resources":
-      let resName = resourceName(rewardId, singularOrPlural);
-      if (rewardId.includes('timehack')) {
-        resName = `<a tabindex="0" class="researcherName" role="button" data-html="true" data-toggle="popover" data-placement="top" data-trigger="focus" data-content="${getTimewarpPopup(rewardId)}">${resName}</a>`
-      }
+      let resValue = parseInt(reward.Value.toString().replace(",","")); // Stupid line to remove commas from SOME inputs ?
+      let resName = "";
 
-      return `${reward.Value} ${resName}`;
+      if (rewardId.includes("timehack_")) {
+        resName = ENGLISH_MAP[`store.bundleitem.${rewardId}.name`];
+      }
+      else {
+        resName = resourceName(rewardId, (reward.Value != 1));
+      }
+      
+      return `${rewardIcon} ${bigNum(resValue)}x ${resName}`;
     break;
       
     case "Gacha":
-      let gachaName = ENGLISH_MAP[`gacha.${rewardId}.name`];
-      return `${gachaName} capsule`;
+      let gachaName = ENGLISH_MAP[`gacha.${rewardId}.name`].replace("Capsule", "");
+      return `${rewardIcon} ${gachaName} Capsule`;
     break;
       
     case "Researcher":
       let researcherRarity = ENGLISH_MAP[`researcher.rarity.${rewardId}.name`];
-      let wordForResearcher = ENGLISH_MAP[`conditionmodel.researcher.${singularOrPlural}`].toLowerCase();
-      return `${reward.Value} ${researcherRarity} ${wordForResearcher}`;
+      let wordForResearcher = ENGLISH_MAP[`conditionmodel.researcher.${singularOrPlural}`];
+      return `${rewardIcon} ${reward.Value}x ${researcherRarity} ${wordForResearcher}`;
+    break;
+
+    case "Avatar":
+      const AvatarDat = DATA["common"].Avatars;
+      let avatarName = "";
+
+      if (reward.RewardId == "LTE AVATAR") {
+          let relatedAvatar = {};
+          AvatarDat.forEach(a => {
+            if (Object.keys(a).includes("UnlockLocation")) {
+              if ((a.UnlockLocation.ThemeId == eventInfo.ThemeId) || (a.UnlockLocation.ThemeId == THEME_DUPLICATE_OVERRIDES[eventInfo.ThemeId])) {
+                relatedAvatar = a;
+                return;
+              }
+            }
+            else if (Object.keys(a).includes("BalancesIncluded")) {
+              if (a.BalancesIncluded.includes(eventInfo.BalanceId)) {
+                relatedAvatar = a;
+                return;
+              }
+            }
+          });
+
+          if (Object.keys(relatedAvatar).length == 0) {
+            avatarReward = "Unknown Avatar Reward<br/>";
+          }
+          else {
+            avatarName = ENGLISH_MAP[`avatar.avatar.rarity.${relatedAvatar.Rarity.toLowerCase()}`];
+            let visualKey = relatedAvatar['VisualKey'];
+            avatarIcon = `<span class="rewardListIconWrapper"><img class='mx-1 rewardIcon' src='${`img/shared/avatars/${visualKey}`}'></span>`;
+  
+            return `${avatarIcon}${avatarName}`;
+          }
+        }
+        else {
+          return "Unknown Avatar Reward";
+        }
     break;
   }
 }
@@ -1802,27 +2011,31 @@ function getRewardIcon(reward, imageOnly = false) {
   
     switch (Reward) {
       case "Gacha": 
-        imgPath = `img/shared/gacha/${RewardId}`; 
+        imgPath = `img/shared/gacha/${RewardId}.png`; 
         break;
       
       case "Researcher": 
-        imgPath = `img/shared/card/card-${RewardId}`; 
+        imgPath = `img/shared/card/card-${RewardId}.png`; 
         break;
         
       default:
         if (RewardId.includes('timehack')) {
-          imgPath = `img/shared/timewarps/${RewardId}`;
-        }
-        else if (RewardId == 'gold') {
-          imgPath = `img/shared/gold`;
+          imgPath = `img/shared/timewarps/${RewardId}.png`;
         }
         else {
-          imgPath = `img/main/${RewardId}`;
+          if (RewardId == 'gold') {
+            imgPath = 'img/shared/gold.png';
+          }
+          else {
+            imgPath = (`img/main/${RewardId}.png`);
+          }
         }
         break;
     }
-  
-    let imgHtml = `<img class='mx-1 rewardIcon' src='${imgPath}.png'>`
+
+    const imgSrc = imgPath.toLowerCase().endsWith('.png') ? imgPath : `${imgPath}.png`;
+    let imgHtml = `<img class='mx-1 rewardIcon' src='${imgSrc}'>`
+
     if (imageOnly || Reward == "Gacha") {
       return imgHtml;
     }

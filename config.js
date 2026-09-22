@@ -16,6 +16,20 @@ var THEME_ID_TITLE_OVERRIDES = {
   "minicockatrice": "Mini Cockatrice"
 };
 
+// For balances that use the same theme, provide a value that corresponds with the folder found in the "img" folder.
+// Examples: All fusions can use the "fusion" theme folder
+const THEME_DUPLICATE_OVERRIDES = {
+  "fusfarm": "fusion",
+  "fusscience": "fusion",
+  "fuspet": "fusion",
+  "fusvehicle": "fusion",
+  "minicockatrice": "cockatrice",
+  "minipotatofactory": "potatofactory",
+  "minisanta": "santa",
+  "minivacation": "bamboo",
+  "minivillain": "supervillain"
+};
+
 // Theme ID != Balance ID
 // This is exclusively seen in Ages for now.
 var THEME_ID_OVERRIDES = {};
