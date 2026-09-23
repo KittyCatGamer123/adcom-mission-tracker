@@ -195,8 +195,6 @@ function setIconCssVar(varName, assetUrl) {
 }
 
 function applyIconCssVariables() {
-    setIconCssVar('--icon-gacha-plastic', 'shared/gacha/plastic.png');
-    setIconCssVar('--icon-gacha-armored', 'shared/gacha/armored.png');
     setIconCssVar('--icon-gacha-wood', 'shared/gacha/wood.png');
     setIconCssVar('--icon-gacha-stone', 'shared/gacha/stone.png');
     setIconCssVar('--icon-gacha-rare', 'shared/gacha/rare.png');
@@ -204,6 +202,9 @@ function applyIconCssVariables() {
     setIconCssVar('--icon-gacha-epic', 'shared/gacha/epic.png');
     setIconCssVar('--icon-gacha-gold', 'shared/gacha/gold.png');
     setIconCssVar('--icon-gacha-supreme', 'shared/gacha/supreme.png');
+    
+    setIconCssVar('--icon-gacha-plastic', 'shared/gacha/plastic.png');
+    setIconCssVar('--icon-gacha-armored', 'shared/gacha/armored.png');
 
     setIconCssVar('--icon-darkscience', 'event/darkscience.png');
     setIconCssVar('--icon-science', 'main/scientist.png');
@@ -279,7 +280,7 @@ function getSchedulePopupEvent(eventInfo) {
   eventRewardNavs += `
     <li class="nav-item">
       <a class="nav-link active" id="${sectionId}-tab" data-toggle="tab" href="#${sectionId}" role="tab" aria-controls="${sectionId}" aria-selected="true">
-        <div class="resourceIcon" style="background-image: url('img/shared/leaderboard_milestone.png');">&nbsp;</div>
+        <div class="resourceIcon" style="background-image: url('img/shared/leaderboard/leaderboard_milestone.png');">&nbsp;</div>
         Milestones
       </a>
     </li>
@@ -316,7 +317,7 @@ function getSchedulePopupEvent(eventInfo) {
       eventRewardNavs += `
         <li class="nav-item">
             <a class="nav-link" id="${sectionId}-tab" data-toggle="tab" href="#${sectionId}" role="tab" aria-controls="${sectionId}" aria-selected="false">
-              <div class="resourceIcon" style="background-image: url('img/shared/leaderboard_segment.png');">&nbsp;</div>
+              <div class="resourceIcon" style="background-image: url('img/shared/leaderboard/leaderboard_segment.png');">&nbsp;</div>
               Leaderboard
             </a>
         </li>
@@ -356,7 +357,7 @@ function getSchedulePopupEvent(eventInfo) {
     eventRewardNavs += `
       <li class="nav-item">
         <a class="nav-link" id="${sectionId}-tab" data-toggle="tab" href="#${sectionId}" role="tab" aria-controls="${sectionId}" aria-selected="false">
-          <div class="resourceIcon" style="background-image: url('img/shared/leaderboard_global.png');">&nbsp;</div>
+          <div class="resourceIcon" style="background-image: url('img/shared/leaderboard/leaderboard_global.png');">&nbsp;</div>
           Global
         </a>
       </li>
@@ -443,7 +444,7 @@ function getAllEventBalanceHtml() {
             name = THEME_ID_TITLE_OVERRIDES["main"];
             siteArgument = `?mode=main`;
         }
-        else if (themeId == "event") {
+        else if (themeId == "event" || themeId == "common") {
             return;
         }
         else {
@@ -888,6 +889,7 @@ function initializePopups() {
   });
 
   applyBodyToPopup('eventBalancePopup', getAllEventBalanceHtml, togglePopover=true);
+  applyBodyToPopup('simulatorPopup', renderCustomCalculator, togglePopover=true, usesTabs=true);
   applyBodyToPopup('balanceInfoPopup', getBalanceInfoPopup, togglePopover=true);
   applyBodyToPopup('schedulePopup', getSchedulePopup, togglePopover=true);
   applyBodyToPopup('allInfoPopup', getAllIndustryPopup, togglePopover=true, usesTabs=true);
@@ -1933,29 +1935,35 @@ function describeMission(mission, overrideIcon = "") {
       iconHtml = getMissionIcon("upgrade", condition.ConditionType, overrideIcon, overrideDirectory);
       textHtml = `${ENGLISH_MAP['mission.researchersupgradedsincesubscription.any.simplename']} (${condition.Threshold})`;
       break;
-    } case "ResourceQuantity": {
+    } 
+    case "ResourceQuantity": {
       iconHtml = getMissionIcon(condition.ConditionId, condition.ConditionType, overrideIcon);
       textHtml = `Own ${resourceName(condition.ConditionId)} (${bigNum(condition.Threshold).replace(/ /g, '&nbsp;')})`;
       break;
-    } case "IndustryUnlocked": {
+    } 
+    case "IndustryUnlocked": {
       let resourceId = getResourceByIndustry(condition.ConditionId).Id;      
       iconHtml = getMissionIcon(resourceId, condition.ConditionType, overrideIcon);
       textHtml = `Unlock ${resourceName(resourceId)}`;
       break;
-    } case "ResourcesEarnedSinceSubscription": {
+    } 
+    case "ResourcesEarnedSinceSubscription": {
       iconHtml = getMissionIcon(condition.ConditionId, condition.ConditionType, overrideIcon);
       textHtml = `Collect ${resourceName(condition.ConditionId)} (${bigNum(condition.Threshold).replace(/ /g, '&nbsp;')})`;
       break;
-    } case "ResearcherCardsEarnedSinceSubscription": {
+    } 
+    case "ResearcherCardsEarnedSinceSubscription": {
       iconHtml = getMissionIcon("card", condition.ConditionType, overrideIcon, "img/shared");
       textHtml = `Collect Cards (${condition.Threshold})`;
       break;
-    } case "ResourcesSpentSinceSubscription": {
+    } 
+    case "ResourcesSpentSinceSubscription": {
       let overrideDirectory = (IsEvent) ? "img/event" : "";  // Use /img/event/ of /img/event/theme/
       iconHtml = getMissionIcon(condition.ConditionId, condition.ConditionType, overrideIcon, overrideDirectory);
       textHtml = `Spend ${resourceName(condition.ConditionId)} (${condition.Threshold})`;
       break;
-    } default:
+    } 
+    default:
       return `Unknown mission condition: ${condition.ConditionType}`;
   }
   
@@ -2669,6 +2677,80 @@ function renderCalculator(mission) {
   }
 }
 
+function renderCustomCalculator() {
+  let resourceId = getData().Resources[0].Id;
+  let wordForTrades = upperCaseFirstLetter(ENGLISH_MAP['conditionmodel.trade.plural']);
+  let formValues = getFormValuesObject();
+  let imgDirectory = getImageDirectory();
+
+  let fullGeneratorTab = ``;
+
+  for (let industry of getData().Industries) {
+    if (industry != getData().Industries[0]) {
+      fullGeneratorTab += "<hr />";
+    } 
+    else {
+      fullGeneratorTab += "<div class='mt-3'></div>"; // Start the first group a bit lower
+    }
+    
+    let researchers = getResearchersByIndustry(industry.Id);
+    let resource = getResourceByIndustry(industry.Id);
+    let resourceNameString = resourceName(resource.Id);
+    
+    // Show the industry name if it isn't the resource.
+    let industryName = ENGLISH_MAP[industry.Id];
+    let singularResouceName = resourceName(resource.Id, false);
+    if (industryName.toLowerCase() != singularResouceName.toLowerCase()) {
+      resourceNameString += ` <em>(${industryName})</em>`;
+    }
+    
+    fullGeneratorTab += `<div class="font-weight-bold mb-2"><img class='resourceIcon mr-1' src='${imgDirectory}/${resource.Id}.png'>${resourceNameString}</div>`;
+    
+    getData().Generators.filter(g => g.IndustryId == industry.Id).forEach(gen => {
+        fullGeneratorTab += getGeneratorInputGroup(gen, researchers, formValues);
+    })
+  }
+  
+  // Display three tabs: one for generators, one for production researchers, one for trades. Then below, options and submit.
+  return `
+    <div id="" role="alert" class="alert alert-danger collapse mx-2 my-2 show">
+        This doesn't do anything currently. Not that anyone uses this fork. :)
+    </div>
+
+    <br/>
+
+    <div class="form-inline">
+        <label for="configMaxSimSeconds" id="configMaxSimSecondsLabel" class="mr-2">
+            <b>Simulation Time</b>: 
+        </label>
+        <input class="form-control w-50" min="1" value="1" id="configMaxSimSeconds" placeholder="Simulation time in hours">
+        <a class="infoButton ml-2" tabindex="-1" role="button" data-toggle="popover" data-trigger="focus" data-html="true" 
+        data-content="The length of time to simulate generators, in hours. <s>Separate the numbers with semicolons ( ; ) for splits.</s>" 
+        data-original-title="" title="">
+            ⓘ
+        </a>
+    </div>
+
+    <br/>
+
+    <ul class="nav nav-tabs" id="calc-tabs" role="tablist">
+      <li class="nav-item">
+        <a class="nav-link active" id="sim-generators-tab" data-toggle="tab" href="#sim-generators" role="tab" aria-controls="sim-generators" aria-selected="true"><div class="resourceIcon" style="background-image: url('${getImageDirectory()}/${resourceId}.png');">&nbsp;</div> Generators</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="sim-researchers-tab" data-toggle="tab" href="#sim-researchers" role="tab" aria-controls="sim-researchers" aria-selected="false"><div class="resourceIcon cardIcon">&nbsp;</div> ${ENGLISH_MAP['gachapurchaseconfirmation.content.panel.go_researchers.txt_name']}</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="sim-trades-tab" data-toggle="tab" href="#sim-trades" role="tab" aria-controls="sim-trades" aria-selected="false"><div class="resourceIcon comradesPerSec">&nbsp;</div> ${wordForTrades}</a>
+      </li>
+    </ul>
+    <div class="tab-content">
+      <div class="tab-pane fade active show" id="sim-generators" role="tabpanel" aria-labelledby="sim-generators-tab">${fullGeneratorTab}</div>
+      <div class="tab-pane fade" id="sim-researchers" role="tabpanel" aria-labelledby="sim-researchers-tab">${getResearchersTab()}</div>
+      <div class="tab-pane fade" id="sim-trades" role="tabpanel" aria-labelledby="sim-trades-tab">${getTradesTab()}</div>
+    </div>`;
+}
+
 function updateImportButton() {
   if ($('#allInfoPopup').hasClass('show')) {
     return; // Don't do anything if it's the all-industries popup.
@@ -2695,7 +2777,7 @@ function updateImportButton() {
 function getBalanceInfoPopup() {
   const themeId = eventScheduleInfo['ThemeId'];
   const lteId = eventScheduleInfo['BalanceId'];
-  const freeScripted =  {"Reward": "Gacha", "RewardId": "sc3", "Value": 1 } // describeReward() requires Reward object to work
+  
   let name;
   let description;
   let lastUpdate = BALANCE_UPDATE_VERSION[lteId] ? BALANCE_UPDATE_VERSION[lteId] : "unknown";
@@ -2793,7 +2875,7 @@ function getBalanceInfoPopup() {
             }
             else if (rewardId.includes('timehack')) {
               resourceImageUrl = `img/shared/timewarps/${rewardId}`;
-              resourceName = `<a tabindex="0" class="researcherName" role="button" data-html="true" data-toggle="popover" data-placement="top" data-trigger="focus" data-content="${getTimewarpPopup(rewardId)}">${resourceName}</a>`
+              resourceName = ENGLISH_MAP[`store.bundleitem.${rewardId}.name`];
             }
 
             let resourceImage = `<img class='rewardIcon' src='${resourceImageUrl}.png'>`;
@@ -2867,22 +2949,6 @@ function getBalanceInfoPopup() {
       <p><strong>Total Cost: </strong>US$${(totalPrice / 100).toFixed(2)}</p>
     </fieldset>
   `
-}
-
-function getTimewarpPopup(timewarpId) {
-  let imageDirectory = `img/shared/timewarps/${timewarpId}.png`;
-  let html = `
-  <img class='resourceIcon mr-1' src='${imageDirectory}'>${ENGLISH_MAP[`resource.${timewarpId}.singular`]}<br />
-  <b>Duration: </b>${ENGLISH_MAP[`store.${timewarpId}.name`]}<br />`;
-
-  let storeWarp = getData()["Store"].filter(item => item['InternalId'] === timewarpId);
-  if (storeWarp.length == 1) {
-    let warpPrice = storeWarp[0]["Price"];
-    let goldHtml = `<img class='mx-1 rewardIcon' src='img/shared/gold.png'>`
-    html += `<b>Cost: </b>${goldHtml}${warpPrice}<br />`;
-  }
-
-  return html;
 }
 
 function getAllIndustryPopup() {
@@ -3167,7 +3233,8 @@ function getCapsuleTablePopup() {
     getData()['GachaLootTable'].forEach(capsule => {
         if (capsule['Type'] !== 'Scripted') {
             let gachaName = ENGLISH_MAP[`gacha.${capsule['Id']}.name`] + " Capsule";
-            let gachaHeader = `<span class="resourceIcon ${capsule['Id']}">&nbsp;</span> ${gachaName} <span class="float-right"><span class="ml-2">(+)</span></span>`;
+            let gachaIcon = `style="background-image: url('img/shared/gacha/${capsule['Id']}.png')"`;
+            let gachaHeader = `<span class="resourceIcon" ${gachaIcon}>&nbsp;</span> ${gachaName} <span class="float-right"><span class="ml-2">(+)</span></span>`;
             let gachaBody = `<table class="table">${getCapsuleTable(capsule)}</table>`;
             output.push(collapseableCard(`capsule-${capsule['Id']}`, gachaHeader, gachaBody, selected=false, styleOverrides="padding:0"));
         }
@@ -3317,6 +3384,16 @@ function percentageConversion(f, decimalOverride = 0) {
     return `${(parseFloat(f) * 100).toFixed(decimalOverride)}%`
 }
 
+function getGeneratorInputGroup(generatorObj, researchersByIndustry, formValues) {
+    let imgDirectory = getImageDirectory();
+    let id = generatorObj.Id;
+    let name = resourceName(id);
+    let popoverTitle = `<img class='resourceIcon mr-1' src='${imgDirectory}/${id}.png'>${name}`;
+    let popoverBody = describeGenerator(generatorObj, researchersByIndustry, formValues);
+    
+    return getResourceInput(`${id}-count`, `# of ${name}`, `${imgDirectory}/${id}.png`, name, "", "", "", popoverTitle, popoverBody);
+}
+
 // Returns html for the calculator's sub-tab where you input generator and resource counts.
 function getGeneratorsTab(mission, industryId) {
   let html = "";
@@ -3326,15 +3403,9 @@ function getGeneratorsTab(mission, industryId) {
   let researchers = getResearchersByIndustry(industryId);
   
   // Make the generators' input boxes
-  let generators = getData().Generators.filter(g => g.IndustryId == industryId);
-  for (let generator of generators) {
-    let id = generator.Id;
-    let name = resourceName(id);
-    let popoverTitle = `<img class='resourceIcon mr-1' src='${imgDirectory}/${id}.png'>${name}`;
-    let popoverBody = describeGenerator(generator, researchers, formValues);
-    
-    html += getResourceInput(`${id}-count`, `# of ${name}`, `${imgDirectory}/${id}.png`, name, "", "", "", popoverTitle, popoverBody);
-  }
+  getData().Generators.filter(g => g.IndustryId == industryId).forEach(gen => {
+    html += getGeneratorInputGroup(gen, researchers, formValues);
+  });
   
   // Make the resources' input boxes
   html += "<hr />";
@@ -3352,7 +3423,7 @@ function getGeneratorsTab(mission, industryId) {
   
   let cpsDefaultValue = formValues.Trades.TotalComrades || "";
   html += getResourceInput("comrades", `# of ${resourceName('comrade')}`, `${imgDirectory}/comrade.png`, `# of ${resourceName('comrade')}`);
-  html += getResourceInput("comradesPerSec", `${resourceName('comrade')}/second`, "img/shared/comrades_per_second.png", `${resourceName('comrade')} Per Second`, cpsDefaultValue);
+  html += getResourceInput("comradesPerSec", `${resourceName('comrade')}/second`, "img/shared/abilities/comrades_per_second.png", `${resourceName('comrade')} Per Second`, cpsDefaultValue);
   
   return html;
 }
